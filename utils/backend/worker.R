@@ -1,18 +1,39 @@
 library('jsonlite')
 library('modules')
 
-run_params <- function(params, fixed_params, variable_params) {
+run_params <- function(script, fixed_params, variable_params) {
 	step_module <- modules::use(script)
 	results <- vector('list', nrow(variable_params))
 	for(i in 1:nrow(variable_params)) {
-		results[[i]] <- step_module$run(merge(fixed_params, variable_params[i,]))
+		results[[i]] <- step_module$run(modifyList(fixed_params, as.list(variable_params[i,,drop=FALSE])))
 	}
 	return(results)
 }
 
+test <- function(script) {
+	step_module <- modules::use(script)
+	params <- step_module$defaults()
+	if(any(names(step_module) == 'step')) {
+		return(list(
+			input_params=params,
+			dynamics_params=step_module$step(params, FALSE, 0),
+			result_params=step_module$run(params)
+		))
+	} else {
+		return(list(
+			input_params=params,
+			dynamics_params=list(),
+			result_params=step_module$run(params)
+		))
+	}
+}
+
 process_job <- function(request) {
-	result <- run_params(request$script, request$fixed_params, request$variable_params)
-	return(result)
+	if(any(names(request$fixed_params) == 'test')) {
+		return(test(request$script))
+	} else {
+		return(run_params(request$script, request$fixed_params, request$variable_params))
+	}
 }
 
 main <- function() {

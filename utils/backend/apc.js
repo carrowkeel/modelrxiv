@@ -15,7 +15,7 @@ const signedURL = (url, signature, query = {}) => {
 
 const scriptFromSources = (sources, credentials, public_url) => { // Will support multiple sources, but currently only using the first as the script file
 	const script_source = sources[0];
-	const filename = `${['script', credentials.user_id, script_source.model_id].join('_')}${script_source.framework === 'js' ? '.mjs' : script_source.framework}`;
+	const filename = `${['script', credentials.user_id, script_source.model_id].join('_')}.${script_source.framework === 'js' ? '.mjs' : script_source.framework}`;
 	const url = public_url + (script_source.private ? signedURL(`/users/${credentials.user_id}/${script_source.model_id}.${script_source.framework}`, credentials.cdn) : `/models/${script_source.model_id}.${script_source.framework}`);
 	return {id: script_source.model_id, url, filename, framework: script_source.framework};
 };

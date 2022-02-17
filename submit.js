@@ -258,9 +258,9 @@ export const submit = (env, {entry, query}, elem, storage={}) => ({
 					id: 'sandbox',
 					name: 'Sandbox',
 					framework,
-					sources: {
-						[`${key.replace(/\//g, '_').replace(/\?.*?$/, '')}`]: signedURL(`/${key}`)
-					},
+					sources: [
+						{type: 'script', private: true, model_id: 'sandbox', framework}
+					],
 					fixed_params: {test: 1},
 					variable_params: [{}],
 					resolve

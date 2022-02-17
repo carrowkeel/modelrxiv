@@ -11,14 +11,15 @@ def test(script):
 	try:
 		step_module = importlib.import_module(script.replace('.py', ''))
 		params = step_module.defaults()
-		return {'input_params': params, 'dynamics_params': step_module.step(step_module.defaults(), Null, 0) if step_module.step else {}, 'result_params': step_module.run(step_module.defaults())}
+		return {'input_params': params, 'dynamics_params': step_module.step(step_module.defaults(), False, 0) if step_module.step else {}, 'result_params': step_module.run(step_module.defaults())}
 	except Exception as e:
+		print(e, file=sys.stderr)
 		return {'error': e}
 
 def process_job(request):
-	if request['fixed_params']['test']:
+	if 'test' in request['fixed_params']:
 		return test(request['script'])
-	else
+	else:
 		return run_params(request['script'], request['fixed_params'], request['variable_params'])
 
 def main():
@@ -26,7 +27,7 @@ def main():
 		message = json.loads(line)
 		if message['type'] != 'job':
 			continue
-		result = run_params(message['request'])
+		result = process_job(message['request'])
 		sys.stdout.write(json.dumps({'type': 'result', 'result': result})+'\n')
 		sys.stdout.flush()
 

@@ -53,10 +53,12 @@ out = step(params, _step, ${t})
 		this.pyodide.globals.set('_step', this.pyodide.toPy(_step));
 		this.pyodide.runPython(code);
 		const outputPr = this.pyodide.globals.get('out');
+		if (!outputPr)
+			return false;
 		const out = outputPr.toJs();
 		outputPr.destroy();
 		return out instanceof Map ? Object.fromEntries(out) : out;
-	} // TODO: define result for models with result() - (replace with run?)
+	}
 });
 
 const stepWrapper = (container, step_module, params, _step, storage=[]) => {

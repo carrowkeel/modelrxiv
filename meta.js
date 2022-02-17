@@ -116,7 +116,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 						name: `${plot_name}_${stat}`,
 						type: 'line_plot_x',
 						xbounds: (param_ranges.x.type === 'select' ? [0, param_ranges.x.range.length - 1] : param_ranges.x.range.slice(0, 2)),
-						ybounds: [0, 1],
+						ybounds: output.range ? output.range.split(',').map(v => +(v)) : [0, 1],
 						draw: 'svg',
 						param_ranges,
 						labels: {title: `${stat}`, x: param_ranges.x.label, y: 'Value'},
