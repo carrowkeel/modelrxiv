@@ -46,7 +46,6 @@ Common flags
 --mode        At the moment this accepts two values, 'subprocess' (default) and 'slurm' (send batches as jobs to Slurm)
 
 Flags for advanced/internal usage
---token       A string JWT for connecting to modelRxiv instead of the default manual authentication
 --request     The name of a file containing the request in JSON format, this is used for delayed batch processing
               If provided, the utility will process the batch immediately and terminate when it is finished processing
 --url         An alternative URL for a WebSocket server if using a different service (default is modelRxiv)
