@@ -1,5 +1,5 @@
 <div class="intro">
-	<p><b>modelRxiv</b> is an open-source repository of published biological models and data analysis pipelines, and a sandbox for model development with compatibility for multiple programming languages and frameworks. In addition to standardized visualization options, the platform also provides an intuitive model analysis interface for exploring the parametric spaces of submitted models. Please see the <a href="/uploading">user guide</a> for more information on submitting models and using the development sandbox.</p>
+	<p><b>modelRxiv</b> is an open-source repository of published biological models and data analysis pipelines, and a sandbox for model development with compatibility for multiple programming languages and frameworks. In addition to standardized visualization options, the platform also provides an intuitive model analysis interface for exploring the parametric spaces of submitted models. Please see the <a href="https://www.biorxiv.org/content/10.1101/2022.02.16.480599v1" target="_blank">preprint</a> for more information on submitting models and using the development sandbox.</p>
 </div>
 <div class="filtered-list">
 	<div class="filters form">

@@ -177,7 +177,7 @@ const hooks = env => [
 		navigate(env, e.detail.url);
 	}],
 	['.mdx-auth', 'authenticated', e => {
-		e.target.innerHTML = `<a class="profile-icon" data-icon="E"></a><div class="profile-menu user-menu menu"><a class="item" href="/owner/me">Profile</a><a class="item" href="/submit">Upload model</a><div class="connect"><a data-action="logout">Logout</a></div></div>`;
+		e.target.innerHTML = `<a class="profile-icon" data-icon="E"></a><div class="profile-menu user-menu menu"><a class="item" href="/submit">Upload model</a><div class="connect"><a data-action="logout">Logout</a></div></div>`;
 	}],
 	['.mdx-auth', 'loggedout', e => {
 		localStorage.removeItem('mdx_token');
