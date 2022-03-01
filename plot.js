@@ -511,7 +511,7 @@ export const plot = (env, {job}, elem, storage={}) => ({
 				return;
 			e.target.parentElement.innerHTML = shorten(+(e.target.value));
 			const ybounds = [plot.querySelector('.ymin, .min').innerText, plot.querySelector('.ymax').innerText].map(v => +(v));
-			plot.dispatchEvent(new CustomEvent('modify', {detail: {plot: {ybounds}}}));
+			plot.closest('.group').querySelectorAll('[data-plot]').forEach(plot => plot.dispatchEvent(new CustomEvent('modify', {detail: {plot: {ybounds}}})));
 		}],
 	]
 });

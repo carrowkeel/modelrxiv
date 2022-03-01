@@ -161,9 +161,6 @@ a.logo {
 	top: 36px;
 	padding: 0;
 }
-.menu.show {
-	display: block;
-}
 .menu .tabs {
 	background: #eee;
 }
@@ -177,9 +174,6 @@ a.logo {
 }
 .menu [data-tab-content] {
 	display: none;
-}
-.menu [data-tab-content].show {
-	display: block;
 }
 [data-tab-content].show + [data-tab-content].show {
 	border-top: 1px solid #eee;
@@ -1101,11 +1095,8 @@ h2 a.tag {
 .editor .error.green {
 	background: #bbd7bb;
 }
-.editor .error.show {
-	display: block;
-}
 .editor .error.show:empty {
-	display: none;
+	display: none !important;
 }
 .editor textarea {
 	width: 100%;

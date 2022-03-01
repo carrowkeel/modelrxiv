@@ -67,7 +67,7 @@ const stepWrapper = (container, step_module, params, _step, storage=[]) => {
 	const complete = (params, storage) => { // TODO: decide how result is handled in dynamics mode
 		const result = step_module.result ? step_module.result(params, storage) : {};
 		container.querySelector('.result-tab').innerHTML = '<h4>Result</h4><pre>'+Object.entries(result).map(([param, value]) => `${param}: ${value}\n`).join('')+'</pre>';
-		container.querySelector('.result-tab').classList.add('show');
+		//container.querySelector('.result-tab').classList.add('show');
 		setTimeout(() => {
 			container.querySelector('.result-tab').classList.remove('show');
 		}, 5000);
