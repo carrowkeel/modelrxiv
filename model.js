@@ -1,6 +1,6 @@
 
 const formatLabel = text => {
-	const label = text.replace(/(^|[^a-zA-Z])([a-zA-Z])_([a-zA-Z0-9])/, '$1$2<sub>$3</sub>');
+	const label = text.replace(/(^|[^a-zA-Z])([a-zA-Z])(_|\^)(\{([^\{]+)\}|[a-zA-Z0-9])/, (_, pre, name, type, sub, sub_curly) => `${pre}${name}<${type === '_' ? 'sub' : 'sup'}>${sub_curly || sub}</${type === '_' ? 'sub' : 'sup'}>`);
 	return text.match(/^[a-zA-Z](_|$)/) ? `<i>${label}</i>` : label;
 };
 

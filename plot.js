@@ -12,6 +12,11 @@ const color_cycle = [
 	[23,190,207]
 ];
 
+const formatLabel = text => {
+	const label = text.replace(/(^|[^a-zA-Z])([a-zA-Z])(_|\^)(\{([^\{]+)\}|[a-zA-Z0-9])/, (_, pre, name, type, sub, sub_curly) => `${pre}${name}<${type === '_' ? 'sub' : 'sup'}>${sub_curly || sub}</${type === '_' ? 'sub' : 'sup'}>`);
+	return text.match(/^[a-zA-Z](_|$)/) ? `<i>${label}</i>` : label;
+};
+
 export const round = (n,p) => { var f = Math.pow(10, p); return Math.round(n * f) / f };
 export const randint = (m, m1, g = Math.random) => Math.floor(g() * (m1 - m)) + m;
 export const range = (start, end) => Array.from(Array(end-start)).map((v,i)=>i+start);
@@ -318,7 +323,7 @@ const canvas_draw = (canvas, ctx, bounds=[[0, 1], [0, 1]], dims=[canvas.dataset.
 export const plot = (env, {job}, elem, storage={}) => ({
 	render: async () => {
 		elem.classList.add('plot');
-		elem.innerHTML = `<div class="header"><div class="settings-menu menu"><a data-action="close">Hide</a><a data-action="save">Save SVG</a><a data-action="export">Export</a></div><a data-icon="f" data-action="settings-menu" class="settings fright"></a><div class="figure-selector"></div></div><div class="legend"></div><div class="group">${job ? `<div class="overlay" data-job="${job.id}"></div>` : ''}</div>`;
+		elem.innerHTML = `<div class="header"><div class="settings-menu menu"><a data-action="close">Hide</a><a data-action="split">Split</a><a data-action="save">Save SVG</a><a data-action="export">Export</a></div><a data-icon="f" data-action="settings-menu" class="settings fright"></a><div class="figure-selector"></div></div><div class="legend"></div><div class="group">${job ? `<div class="overlay" data-job="${job.id}"></div>` : ''}</div>`;
 		elem.dispatchEvent(new Event('done'));
 	},
 	hooks: [
@@ -327,10 +332,10 @@ export const plot = (env, {job}, elem, storage={}) => ({
 			const plot = parse(plot_template, params);
 			const plot_element = elem.querySelector(`[data-name="${plot.name}"]`) ? elem.querySelector(`[data-name="${plot.name}"]`) : document.createElement('div'); // Temporary fix, this redraws the plot using the same DOM element
 			plot_element.dataset.plot = plot.type; // Fix
-			for (const prop in plot) // Should have name, type, title (plot.labels.title -> plot.title), xbounds, ybounds
+			for (const prop in plot)
 				plot_element.dataset[prop] = typeof plot[prop] !== 'string' ? JSON.stringify(plot[prop]) : plot[prop];
 			plot_element.setAttribute('draggable', 'true');
-			plot_element.innerHTML = `<div class="axis-label label-x">${plot.labels.x}</div><div class="axis-label label-y">${plot.labels.y}</div>${plot.xbounds[0] === plot.ybounds[0] ? `<div class="axis-tick min">${shorten(plot.xbounds[0])}</div>` : `<div class="axis-tick xmin">${shorten(plot.xbounds[0])}</div><div class="axis-tick ymin editable" title="Edit y-axis">${shorten(plot.ybounds[0])}</div>`}<div class="axis-tick xmax">${shorten(plot.xbounds[1])}</div><div class="axis-tick ymax editable" title="Edit y-axis">${shorten(plot.ybounds[1])}</div></div>`;
+			plot_element.innerHTML = `<div class="axis-label label-x">${formatLabel(plot.labels.x)}</div><div class="axis-label label-y">${formatLabel(plot.labels.y)}</div>${plot.xbounds[0] === plot.ybounds[0] ? `<div class="axis-tick min">${shorten(plot.xbounds[0])}</div>` : `<div class="axis-tick xmin">${shorten(plot.xbounds[0])}</div><div class="axis-tick ymin editable" title="Edit y-axis">${shorten(plot.ybounds[0])}</div>`}<div class="axis-tick xmax">${shorten(plot.xbounds[1])}</div><div class="axis-tick ymax editable" title="Edit y-axis">${shorten(plot.ybounds[1])}</div></div>`;
 			elem.querySelector('.group').appendChild(plot_element);
 			const bounds = [plot.xbounds, plot.ybounds];
 			const draw = plot.type === 'proportion_plot' || plot.draw === 'canvas' ? createCanvas(plot_element, bounds) : createSVG(plot_element, bounds);
@@ -347,19 +352,29 @@ export const plot = (env, {job}, elem, storage={}) => ({
 						if (!selector.querySelector(`[data-figure="${plot.name}"]`)) {
 							const link = document.createElement('a');
 							link.dataset.figure = plot.name;
-							link.innerText = plot.labels.title;
+							link.innerHTML = formatLabel(plot.labels.title);
 							selector.appendChild(link);
 						}
 					});
 					break;
 				case ['line_plot', 'line_plot_x', 'lines'].includes(plots[0].plot):
-					selector.innerHTML = `<a>${plots.length === 1 ? plots[0].labels.title : plots[0].labels.y}</a>`;
+					selector.innerHTML = `<a>${plots.length === 1 ? formatLabel(plots[0].labels.title) : formatLabel(plots[0].labels.y)}</a>`;
 					elem.querySelector('.legend').innerHTML = plots.map(plot => {
-						return `<a data-line="${plot.name}">${plot.labels.title}</a>`;
+						return `<a data-line="${plot.name}">${formatLabel(plot.labels.title)}</a>`;
 					}).join('');
 			}
 		}],
-		['[data-plot]', 'modify', e => { // Edit bounds (mainly) and clear canvas/svg
+		['[data-module="plot"]', 'split', e => {
+			const container = e.target;
+			for (const plot of container.querySelectorAll('[data-plot]')) {
+				const cloned = container.cloneNode(true);
+				container.parentElement.insertBefore(cloned, container);
+				cloned.querySelectorAll('[data-plot]').forEach(elem => elem.dataset.name !== plot.dataset.name ? elem.remove() : 0);
+				cloned.dispatchEvent(new Event('update'));
+			}
+			container.remove();
+		}],
+		['[data-plot]', 'modify', e => {
 			const {plot: plot_template, params} = e.detail;
 			const plot = parse(plot_template, params);
 			for (const prop in plot)
@@ -394,6 +409,9 @@ export const plot = (env, {job}, elem, storage={}) => ({
 			const figure = e.target.dataset.figure;
 			elem.querySelector('.group').insertBefore(elem.querySelector(`[data-plot][data-name="${figure}"]`), elem.querySelector('[data-plot]:first-child'));
 			elem.querySelector('.figure-selector').insertBefore(e.target, elem.querySelector('.figure-selector>a:first-child'));
+		}],
+		['[data-action="split"]', 'click', e => {
+			e.target.closest('.plot').dispatchEvent(new Event('split'));
 		}],
 		['[data-action="close"]', 'click', e => {
 			e.target.closest('.plot').remove();
