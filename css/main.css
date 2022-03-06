@@ -428,7 +428,8 @@ polygon.proportion:hover {
 	stroke: #f90;
 	stroke-width: 2px;
 }
-.group {
+.group, .draw_frame {
+	display: inline-block;
 	position: relative;
 }
 .plot [data-plot] {
@@ -437,25 +438,22 @@ polygon.proportion:hover {
 	border-width: 0 0 1px 1px;
 	background: #fff;
 }
-.plot [data-plot^="line"]:not(:first-child) {
+.plot:not(:last-child) {
 	position: absolute;
 	z-index: 0;
 	top: 0;
 	bottom: 0;
 	left: 0;
 	right: 0;
+}
+.plot:not(:first-child) [data-plot^="line"] {
 	background: transparent;
 }
-.plot [data-plot]:not(:first-child) .axis-tick, .plot [data-plot]:not(:first-child) .axis-label {
-	display: none;
+.plot:not(:last-child) .header, .plot:not(:last-child) .axis-tick, .plot:not(:last-child) .axis-label {
+	visibility: hidden;
 }
-.plot [data-plot="hist_2d"]:not(:first-child) {
-	position: absolute;
-	z-index: 0;
-	top: 0;
-	bottom: 0;
-	left: 0;
-	right: 0;
+.plot:not(:last-child) [data-plot="hist_2d"] {
+	display: none;
 }
 .plot .legend a:nth-child(1):before {
 	background: var(--color-cycle-1);
@@ -469,31 +467,19 @@ polygon.proportion:hover {
 .plot .legend a:nth-child(4):before {
 	background: var(--color-cycle-4);
 }
-.plot [data-plot^="line"]:nth-child(1) polyline {
+.plot:nth-child(1) [data-plot^="line"] polyline {
 	stroke: var(--color-cycle-1);
 }
-.plot [data-plot^="line"]:nth-child(2) polyline {
+.plot:nth-child(2) [data-plot^="line"] polyline {
 	stroke: var(--color-cycle-2);
 }
-.plot [data-plot^="line"]:nth-child(3) polyline {
+.plot:nth-child(3) [data-plot^="line"] polyline {
 	stroke: var(--color-cycle-3);
 }
-.plot [data-plot^="line"]:nth-child(4) polyline {
+.plot:nth-child(4) [data-plot^="line"] polyline {
 	stroke: var(--color-cycle-4);
 }
-.plot [data-plot^="line_"]:nth-child(1) polyline:nth-child(1) {
-	stroke: var(--color-cycle-1);
-}
-.plot [data-plot^="line_"]:nth-child(1) polyline:nth-child(2) {
-	stroke: var(--color-cycle-2);
-}
-.plot [data-plot^="line_"]:nth-child(1) polyline:nth-child(3) {
-	stroke: var(--color-cycle-3);
-}
-.plot [data-plot^="line_"]:nth-child(1) polyline:nth-child(4) {
-	stroke: var(--color-cycle-4);
-}
-[data-plot].dragover {
+.group.dragover {
 	background: #ffe99b;
 }
 .plot .overlay {

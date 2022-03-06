@@ -323,27 +323,27 @@ const canvas_draw = (canvas, ctx, bounds=[[0, 1], [0, 1]], dims=[canvas.dataset.
 export const plot = (env, {job}, elem, storage={}) => ({
 	render: async () => {
 		elem.classList.add('plot');
-		elem.innerHTML = `<div class="header"><div class="settings-menu menu"><a data-action="close">Hide</a><a data-action="split">Split</a><a data-action="save">Save SVG</a><a data-action="export">Export</a></div><a data-icon="f" data-action="settings-menu" class="settings fright"></a><div class="figure-selector"></div></div><div class="legend"></div><div class="group">${job ? `<div class="overlay" data-job="${job.id}"></div>` : ''}</div>`;
+		elem.innerHTML = `<div class="header"><div class="settings-menu menu"><a data-action="close">Hide</a><a data-action="split">Split</a><a data-action="save">Save SVG</a><a data-action="export">Export</a></div><a data-icon="f" data-action="settings-menu" class="settings fright"></a><div class="figure-selector"></div></div><div class="legend"></div><div class="draw_area">${job ? `<div class="overlay" data-job="${job.id}"></div>` : ''}</div>`;
 		elem.dispatchEvent(new Event('done'));
 	},
 	hooks: [
 		['[data-module="plot"]', 'init', e => {
 			const {plot: plot_template, params} = e.detail;
+			elem.setAttribute('draggable', 'true');
 			const plot = parse(plot_template, params);
 			const plot_element = elem.querySelector(`[data-name="${plot.name}"]`) ? elem.querySelector(`[data-name="${plot.name}"]`) : document.createElement('div'); // Temporary fix, this redraws the plot using the same DOM element
 			plot_element.dataset.plot = plot.type; // Fix
 			for (const prop in plot)
 				plot_element.dataset[prop] = typeof plot[prop] !== 'string' ? JSON.stringify(plot[prop]) : plot[prop];
-			plot_element.setAttribute('draggable', 'true');
 			plot_element.innerHTML = `<div class="axis-label label-x">${formatLabel(plot.labels.x)}</div><div class="axis-label label-y">${formatLabel(plot.labels.y)}</div>${plot.xbounds[0] === plot.ybounds[0] ? `<div class="axis-tick min">${shorten(plot.xbounds[0])}</div>` : `<div class="axis-tick xmin">${shorten(plot.xbounds[0])}</div><div class="axis-tick ymin editable" title="Edit y-axis">${shorten(plot.ybounds[0])}</div>`}<div class="axis-tick xmax">${shorten(plot.xbounds[1])}</div><div class="axis-tick ymax editable" title="Edit y-axis">${shorten(plot.ybounds[1])}</div></div>`;
-			elem.querySelector('.group').appendChild(plot_element);
+			elem.querySelector('.draw_area').appendChild(plot_element);
 			const bounds = [plot.xbounds, plot.ybounds];
 			const draw = plot.type === 'proportion_plot' || plot.draw === 'canvas' ? createCanvas(plot_element, bounds) : createSVG(plot_element, bounds);
 			elem.dispatchEvent(new Event('update'));
 		}],
 		['[data-module="plot"]', 'update', e => {
 			const selector = elem.querySelector('.figure-selector');
-			const plots = Array.from(elem.querySelectorAll('[data-plot]')).map(plot => Object.assign({}, plot.dataset, {labels: JSON.parse(plot.dataset.labels)}));
+			const plots = Array.from(elem.closest('.group').querySelectorAll('[data-plot]')).map(plot => Object.assign({}, plot.dataset, {labels: JSON.parse(plot.dataset.labels)}));
 			if (plots.length === 0)
 				return e.target.remove();
 			switch(true) {
@@ -365,12 +365,13 @@ export const plot = (env, {job}, elem, storage={}) => ({
 			}
 		}],
 		['[data-module="plot"]', 'split', e => {
-			const container = e.target;
-			for (const plot of container.querySelectorAll('[data-plot]')) {
-				const cloned = container.cloneNode(true);
-				container.parentElement.insertBefore(cloned, container);
-				cloned.querySelectorAll('[data-plot]').forEach(elem => elem.dataset.name !== plot.dataset.name ? elem.remove() : 0);
-				cloned.dispatchEvent(new Event('update'));
+			const container = e.target.closest('.group');
+			for (const plot of container.querySelectorAll('.plot')) {
+				const group = document.createElement('div');
+				group.classList.add('group');
+				container.parentElement.insertBefore(group, container);
+				group.appendChild(plot);
+				group.querySelectorAll('.plot').forEach(plot => plot.dispatchEvent(new Event('update')));
 			}
 			container.remove();
 		}],
@@ -452,36 +453,39 @@ export const plot = (env, {job}, elem, storage={}) => ({
 			menu.style.top = (e.offsetY + 25) + 'px';
 			menu.classList.add('show');
 		}],
-		['[data-plot]', 'dragstart', e => {
+		['.plot', 'dragstart', e => {
 			e.target.classList.add('dragged');
 		}],
-		['[data-plot]', 'dragend', e => {
+		['.plot', 'dragend', e => {
 			e.target.classList.remove('dragged');
 		}],
-		['[data-plot] *, [data-plot]', 'dragover', e => {
+		['.group *, .group', 'dragover', e => {
 			e.preventDefault();
-			const plot = e.target.closest('[data-plot]');
-			const dragged = document.querySelector('[data-plot].dragged');
-			if (!dragged || e.target === dragged)
+			const target_group = e.target.closest('.group');
+			const dragged = document.querySelector('.plot.dragged');
+			if (!dragged || e.target === dragged || dragged.closest('.group') === target_group)
 				return;
-			plot.classList.add('dragover');
+			target_group.classList.add('dragover');
 		}],
-		['[data-plot] *, [data-plot]', 'drop', e => {
+		['.group *, .group', 'drop', e => {
 			e.preventDefault();
-			const target = e.target.closest('[data-plot]');
-			const dragged = document.querySelector('[data-plot].dragged');
-			const dragged_container = dragged.closest('[data-module="plot"]');
-			target.parentElement.appendChild(dragged);
-			target.classList.remove('dragover');
+			const target_group = e.target.closest('.group');
+			const dragged = document.querySelector('.plot.dragged');
+			const source_group = dragged.closest('.group');
+			target_group.appendChild(dragged);
+			target_group.classList.remove('dragover');
 			dragged.classList.remove('dragged');
-			dragged_container.dispatchEvent(new Event('update'));
-			target.closest('[data-module="plot"]').dispatchEvent(new Event('update'));
+			if (source_group.querySelectorAll('.plot').length === 0)
+				source_group.remove();
+			else
+				source_group.querySelectorAll('.plot').forEach(plot => plot.dispatchEvent(new Event('update')));
+			target_group.querySelectorAll('.plot').forEach(plot => plot.dispatchEvent(new Event('update')));
 		}],
-		['[data-plot] *, [data-plot]', 'dragleave', e => {
-			const plot = e.target.closest('[data-plot]');
-			plot.classList.remove('dragover');
+		['.group *, .group', 'dragleave', e => {
+			const target_group = e.target.closest('.group');
+			target_group.classList.remove('dragover');
 		}],
-		['[data-action]', 'click', e => { // TODO: update this, some actions are irrelevant and remaining code should be split
+		['[data-action]', 'click', e => {
 			const action = e.target.dataset.action;
 			const plot = e.target.closest('.plot').querySelector('[data-plot]');
 			switch(action) {
@@ -524,12 +528,12 @@ export const plot = (env, {job}, elem, storage={}) => ({
 			e.target.querySelector('input').select();
 		}],
 		['.ymin input, .ymax input', 'keyup', e => {
-			const plot = e.target.closest('[data-plot]');
+			const plot = e.target.closest('.plot');
 			if (e.keyCode !== 13)
 				return;
 			e.target.parentElement.innerHTML = shorten(+(e.target.value));
 			const ybounds = [plot.querySelector('.ymin, .min').innerText, plot.querySelector('.ymax').innerText].map(v => +(v));
-			plot.closest('.group').querySelectorAll('[data-plot]').forEach(plot => plot.dispatchEvent(new CustomEvent('modify', {detail: {plot: {ybounds}}})));
+			plot.dispatchEvent(new CustomEvent('modify', {detail: {plot: {ybounds}}}));
 		}],
 	]
 });

@@ -61,7 +61,11 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 		console.log(e);
 		return Promise.reject('Failed to run grid');
 	}).then(grouped);
-	const {module: plot_container} = await addModule(container, 'plot', {job: {id}});
+	const group = document.createElement('div');
+	group.classList.add('group');
+	group.innerHTML = `<div data-job="${id}"></div>`;
+	container.appendChild(group);
+	//const {module: plot_container} = await addModule(group, 'plot', {job: {id}});
 	const step = Object.keys(param_ranges).reduce((a,k) => Object.assign(a, {[k]: param_ranges[k].type === 'select' ? 1 : (param_ranges[k].range[1] - param_ranges[k].range[0] === 0 ? 1 : (param_ranges[k].range[1] - param_ranges[k].range[0])) / 2**param_ranges[k].range[2]}), {});
 	const axes = ['x', 'y', 'z', 's'].reduce((axes, axis) => {
 		if (!param_ranges[axis])
@@ -107,12 +111,13 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 		case 1: {
 			dist(user_params, axes.x.map(x => {
 				return {[param_ranges.x.name]: x};
-			})).then(results => {
+			})).then(async results => {
 				for (const stat in results) {
 					const output = Object.assign({}, entry.result_params.find(param => param.name === stat));
 					const output_values = output.type === 'disc' ? Object.fromEntries(output.values.map(output => [output.name, output])) : {};
 					const line = results[stat].map((value,i) => [[param_ranges.x.type === 'select' ? i : axes.x[i], output.type === 'disc' ? +(output_values[value].value) : value]]);
-					plot_container.dispatchEvent(new CustomEvent('init', {detail: {plot: {
+					const {module: plot_module} = await addModule(group, 'plot');
+					plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
 						name: `${plot_name}_${stat}`,
 						type: 'line_plot_x',
 						xbounds: (param_ranges.x.type === 'select' ? [0, param_ranges.x.range.length - 1] : param_ranges.x.range.slice(0, 2)),
@@ -122,7 +127,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 						labels: {title: `${stat}`, x: param_ranges.x.label, y: 'Value'},
 						outputs: entry.result_params
 					}, params: user_params}}));
-					plot_container.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: line}}));
+					plot_module.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: line}}));
 				}
 			});
 			break;
@@ -133,13 +138,14 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 					return {x, y, params: {[param_ranges.x.name]: x, [param_ranges.y.name]: y}};
 				}));
 			}, []);
-			dist(user_params, grid.map(v => v.params)).then(results => {
+			dist(user_params, grid.map(v => v.params)).then(async results => {
 				for (const stat in results) {
 					const output = Object.assign({}, entry.result_params.find(param => param.name === stat));
 					if (output.values && output.values instanceof Array)
 						output.values = Object.fromEntries(output.values.map(output => [output.name, output])); // TODO: Find a better solution, maybe do this when setting up entry. This previously caused an issue by mutated values for the submit form
 					const squares = results[stat].map((result,i) => dataPoint(output, param_ranges, result, grid[i].x, grid[i].y, [step.x, step.y]));
-					plot_container.dispatchEvent(new CustomEvent('init', {detail: {plot: {
+					const {module: plot_module} = await addModule(group, 'plot');
+					plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
 						name: `${plot_name}_${stat}`,
 						type: 'hist_2d',
 						xbounds: (param_ranges.x.type === 'select' ? [0, param_ranges.x.range.length - 1] : param_ranges.x.range.slice(0, 2)),
@@ -150,7 +156,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 						labels: {title: `${title}, ${stat}`, x: param_ranges.x.label, y: param_ranges.y.label},
 						outputs: entry.result_params
 					}, params: user_params}}));
-					plot_container.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: squares}}));
+					plot_module.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: squares}}));
 				}
 			});
 			break;
@@ -175,7 +181,8 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 			});
 			const keys = Object.keys(values.reduce((a, v) => Object.keys(v).reduce((_a, k) => Object.assign(_a, {[k]: 1}), a), {}));
 			const lines = values.map((value, i) => keys.map(_i => [axes.z[i], value[_i] ? value[_i] : 0]));
-			plot_container.dispatchEvent(new CustomEvent('init', {detail: {plot: {
+			const {module: plot_module} = await addModule(group, 'plot');
+			plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
 				name: plot_name,
 				type: 'line_plot_x',
 				xbounds: param_ranges.z.range.slice(0, 2),
@@ -185,7 +192,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 				labels: {title, x: param_ranges.x.label, y: 'Proportion'},
 				outputs: entry.result_params
 			}, params: user_params}}));
-			plot_container.querySelector(`[data-name="${plot_name}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: lines}}));
+			plot_module.querySelector(`[data-name="${plot_name}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: lines}}));
 			break;
 		}
 		case 4: {
@@ -210,7 +217,8 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 				return filtered_indexes.map((_,i) => mean(results[stat].slice(filtered_indexes[i], filtered_indexes[i+1])));
 			});
 			const line = values.map((value,i) => [[axes.z[i], value]]);
-			plot_container.dispatchEvent(new CustomEvent('init', {detail: {plot: {
+			const {module: plot_module} = await addModule(group, 'plot');
+			plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
 				name: `${plot_name}_${stat}`,
 				type: 'line_plot_x',
 				xbounds: param_ranges.z.range.slice(0, 2),
@@ -220,7 +228,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 				labels: {title, x: param_ranges.z.label, y: 'Proportion'},
 				outputs: entry.result_params
 			}, params: user_params}}));
-			plot_container.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: line}}));
+			plot_module.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: line}}));
 			break;
 		}
 	}

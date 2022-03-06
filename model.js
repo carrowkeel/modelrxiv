@@ -188,8 +188,16 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 				case elem.querySelector('.plots') !== null:
 					storage.params = numericize(readForm(elem.querySelector('.parameters-menu .form'), defaultsFromInput(entry.input_params)));
 					const plots_container = elem.querySelector('.plots');
-					await Promise.all(plotsFromOutput(entry).map(plot => !plots_container.querySelector(`[data-name="${plot.name}"]`) ? addModule(plots_container, 'plot').then(({module: group}) => group.dispatchEvent(new CustomEvent('init', {detail: {plot, params: storage.params}}))) : plots_container.querySelector(`[data-name="${plot.name}"]`).dispatchEvent(new CustomEvent('modify', {detail: {plot: {xbounds: plot.xbounds}, params: storage.params}}))));
-					//groupPlots(plots_container);
+					await Promise.all(plotsFromOutput(entry).map(plot => {
+						if (!plots_container.querySelector(`[data-name="${plot.name}"]`)) {
+							const group = document.createElement('div');
+							group.classList.add('group');
+							plots_container.appendChild(group);
+							addModule(group, 'plot').then(({module: plot_module}) => plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot, params: storage.params}})))
+						} else
+							plots_container.querySelector(`[data-name="${plot.name}"]`).dispatchEvent(new CustomEvent('modify', {detail: {plot: {xbounds: plot.xbounds}, params: storage.params}}));
+					}));
+					//groupPlots(plots_container); // Auto-grouping
 			}
 		}],
 		['[data-module="model"]', 'run', async e => {
