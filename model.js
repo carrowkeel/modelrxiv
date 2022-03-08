@@ -108,8 +108,9 @@ const parsePresets = (presetText) => {
 	return presets;
 };
 
+// TODO: move to plot module
 const groupPlots = (container) => {
-	const plots = Array.from(container.querySelectorAll('.plot')).filter(module => module.querySelectorAll('[data-plot]').length === 1).map(module => Object.assign({elem: module.querySelector('[data-plot]')}, module.querySelector('[data-plot]').dataset, {labels: JSON.parse(module.querySelector('[data-plot]').dataset.labels)}));
+	const plots = Array.from(container.querySelectorAll('.plot:first-child:last-child [data-plot]')).map(plot => Object.assign({elem: plot.closest('.plot')}, plot.dataset, {labels: JSON.parse(plot.dataset.labels)}));
 	const grouped = plots.reduce((groups, plot) => {
 		const key = [plot.labels.x, plot.labels.y, plot.xbounds, plot.ybounds].join(',');
 		return Object.assign(groups, {[key]: groups[key] ? groups[key].concat(plot.elem) : [plot.elem]});
@@ -117,12 +118,13 @@ const groupPlots = (container) => {
 	for (const group of Object.values(grouped)) {
 		if (group.length < 2)
 			continue;
+		const target_group = group[0].closest('.group');
 		for (const plot of group.slice(1)) {
-			const plot_module = plot.closest('[data-module="plot"]');
-			group[0].parentElement.appendChild(plot);
-			plot_module.dispatchEvent(new Event('update'));
+			const source_group = plot.closest('.group');
+			target_group.appendChild(plot);
+			source_group.remove();
 		}
-		group[0].closest('[data-module="plot"]').dispatchEvent(new Event('update'));
+		group.forEach(plot => plot.dispatchEvent(new Event('update')));
 	}
 };
 
@@ -193,11 +195,11 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 							const group = document.createElement('div');
 							group.classList.add('group');
 							plots_container.appendChild(group);
-							addModule(group, 'plot').then(({module: plot_module}) => plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot, params: storage.params}})))
+							return addModule(group, 'plot').then(({module: plot_module}) => plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot, params: storage.params}})))
 						} else
 							plots_container.querySelector(`[data-name="${plot.name}"]`).dispatchEvent(new CustomEvent('modify', {detail: {plot: {xbounds: plot.xbounds}, params: storage.params}}));
 					}));
-					//groupPlots(plots_container); // Auto-grouping
+					groupPlots(plots_container); // Auto-grouping
 			}
 		}],
 		['[data-module="model"]', 'run', async e => {
