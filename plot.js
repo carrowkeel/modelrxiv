@@ -528,12 +528,12 @@ export const plot = (env, {job}, elem, storage={}) => ({
 			e.target.querySelector('input').select();
 		}],
 		['.ymin input, .ymax input', 'keyup', e => {
-			const plot = e.target.closest('.plot');
+			const plot = e.target.closest('[data-plot]');
 			if (e.keyCode !== 13)
 				return;
 			e.target.parentElement.innerHTML = shorten(+(e.target.value));
 			const ybounds = [plot.querySelector('.ymin, .min').innerText, plot.querySelector('.ymax').innerText].map(v => +(v));
-			plot.dispatchEvent(new CustomEvent('modify', {detail: {plot: {ybounds}}}));
+			plot.closest('.group').querySelectorAll('[data-plot]').forEach(plot => plot.dispatchEvent(new CustomEvent('modify', {detail: {plot: {ybounds}}})));
 		}],
 	]
 });
