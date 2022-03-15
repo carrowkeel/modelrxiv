@@ -655,6 +655,10 @@ polygon.proportion:hover {
 [data-module="model"] .authors:empty {
 	display: none;
 }
+[data-module="model"] .doi {
+	font-size: 13px;
+	margin: 10px 0;
+}
 [data-module="model"] .description {
 	font-size: 14px;
 	margin: 10px 0 15px;
