@@ -110,9 +110,7 @@ const parsePresets = (presetText) => {
 
 // TODO: move to plot module
 const groupPlots = (container) => {
-	console.log(container);
-	const plots = Array.from(container.querySelectorAll('.plot [data-plot]:first-child:last-child')).map(plot => Object.assign({elem: plot.closest('.plot')}, plot.dataset, {labels: JSON.parse(plot.dataset.labels)}));
-	console.log(plots);
+	const plots = Array.from(container.querySelectorAll('.plot:first-child:last-child [data-plot]')).map(plot => Object.assign({elem: plot.closest('.plot')}, plot.dataset, {labels: JSON.parse(plot.dataset.labels)}));
 	const grouped = plots.reduce((groups, plot) => {
 		const key = [plot.labels.x, plot.labels.y, plot.xbounds, plot.ybounds].join(',');
 		return Object.assign(groups, {[key]: groups[key] ? groups[key].concat(plot.elem) : [plot.elem]});
@@ -201,7 +199,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 						} else
 							plots_container.querySelector(`[data-name="${plot.name}"]`).dispatchEvent(new CustomEvent('modify', {detail: {plot: {xbounds: plot.xbounds}, params: storage.params}}));
 					}));
-					//groupPlots(plots_container); // Auto-grouping
+					groupPlots(plots_container); // Auto-grouping
 			}
 		}],
 		['[data-module="model"]', 'run', async e => {
