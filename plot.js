@@ -330,7 +330,7 @@ const canvas_draw = (canvas, ctx, bounds=[[0, 1], [0, 1]], dims=[canvas.dataset.
 export const plot = (env, {job}, elem, storage={}) => ({
 	render: async () => {
 		elem.classList.add('plot');
-		elem.innerHTML = `<div class="header"><div class="settings-menu menu"><a data-action="close">Hide</a><a data-action="split">Split</a><a data-action="save">Save SVG</a><a data-action="export">Export</a></div><a data-icon="f" data-action="settings-menu" class="settings fright"></a><div class="figure-selector"></div></div><div class="legend"></div><div class="draw_area">${job ? `<div class="overlay" data-job="${job.id}"></div>` : ''}</div>`;
+		elem.innerHTML = `<div class="header"><div class="settings-menu menu"><a data-action="close">Hide</a><a data-action="split">Split</a><a data-action="save">Save SVG</a><a data-action="export">Export</a></div><a data-icon="f" data-action="settings-menu" class="settings fright"></a><div class="figure-selector"></div></div><div class="console"></div><div class="legend"></div><div class="draw_area">${job ? `<div class="overlay" data-job="${job.id}"></div>` : ''}</div>`;
 		elem.dispatchEvent(new Event('done'));
 	},
 	hooks: [
@@ -366,7 +366,7 @@ export const plot = (env, {job}, elem, storage={}) => ({
 					break;
 				case ['line_plot', 'line_plot_x', 'lines'].includes(plots[0].plot):
 					selector.innerHTML = `<a>${plots.length === 1 ? formatLabel(plots[0].labels.title) : formatLabel(plots[0].labels.y)}</a>`;
-					elem.querySelector('.legend').innerHTML = plots.map(plot => {
+					elem.querySelector('.legend').innerHTML = plots.length === 1 ? '' : plots.map(plot => {
 						return `<a data-line="${plot.name}">${formatLabel(plot.labels.title)}</a>`;
 					}).join('');
 			}
@@ -423,6 +423,16 @@ export const plot = (env, {job}, elem, storage={}) => ({
 		}],
 		['[data-action="close"]', 'click', e => {
 			e.target.closest('.plot').remove();
+		}],
+		['[data-plot*="line"] canvas, [data-plot*="line"] canvas *, [data-plot*="line"] svg, [data-plot*="line"] svg *', 'click', e => {
+			const plot = e.target.closest('[data-plot]');
+			const display = plot.querySelector('svg, canvas');
+			const bounds = [plot.dataset.xbounds, plot.dataset.ybounds].map(JSON.parse);
+			const [x, y] = [
+				bounds[0][0] + (bounds[0][1] - bounds[0][0]) * e.offsetX / display.getBoundingClientRect().width,
+				bounds[1][0] + (bounds[1][1] - bounds[1][0]) * (1 - e.offsetY / display.getBoundingClientRect().height)
+			].map(v => round(v, 3));
+			plot.closest('.plot').querySelector('.console').innerHTML = `x: ${x}, y: ${y}`;
 		}],
 		['[data-plot="hist_2d"]', 'mouseenter', e => {
 			const plot = e.target;

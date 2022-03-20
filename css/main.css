@@ -564,6 +564,14 @@ polygon.proportion:hover {
 	top: 5px;
 	right: 5px;
 }
+.plot .console {
+	position: absolute;
+	bottom: 27px;
+	right: 20px;
+	z-index: 1;
+	font-size: 12px;
+	color: #666;
+}
 .plot .legend {
 	position: absolute;
 	z-index: 50;
