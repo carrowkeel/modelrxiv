@@ -331,5 +331,7 @@ const init = async () => {
 };
 
 window.addEventListener('load', () => {
+	if (window.location.origin.match('www.modelrxiv.org'))
+		return window.location.href = 'https://modelrxiv.org';
 	init();
 });

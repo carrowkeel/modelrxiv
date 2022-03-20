@@ -19,7 +19,7 @@ const fieldsFromForm = (input_params, query) => {
 					return `<input type="text" data-type="json" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">`;
 			}
 		})();
-		return `<div class="option" data-name="${name}" data-type="${type}" data-label="${label}"><label><input type="text" disabled="disabled">${formatLabel(label)}</label><div class="values">${input_field}</div></div>`;
+		return `<div class="option" data-name="${name}" data-type="${type}" data-label="${label}"><label title="${description}"><input type="text" disabled="disabled">${formatLabel(label)}</label><div class="values">${input_field}</div></div>`;
 	}).join('');
 };
 
