@@ -479,6 +479,18 @@ polygon.proportion:hover {
 .plot:nth-child(4) [data-plot^="line"] polyline {
 	stroke: var(--color-cycle-4);
 }
+.plot:nth-child(1) [data-plot^="line"] polygon {
+	fill: var(--color-cycle-1);
+}
+.plot:nth-child(2) [data-plot^="line"] polygon {
+	fill: var(--color-cycle-2);
+}
+.plot:nth-child(3) [data-plot^="line"] polygon {
+	fill: var(--color-cycle-3);
+}
+.plot:nth-child(4) [data-plot^="line"] polygon {
+	fill: var(--color-cycle-4);
+}
 .group.dragover {
 	background: #ffe99b;
 }

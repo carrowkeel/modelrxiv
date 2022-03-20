@@ -26,6 +26,7 @@ export const linspace = (a,b,c) => Array.from(new Array(c)).map((v,i) => round(a
 export const quartile = (arr, q) => mean(Array.prototype.slice.apply(arr.sort((a,b)=>a-b),(arr.length-1)%(1/q)===0?[(arr.length-1)*q,(arr.length-1)*q+1]:[Math.floor((arr.length-1)*q),Math.ceil((arr.length-1)*q)+1]));
 export const median = arr => quartile(arr, 0.5);
 export const mean = arr => arr.length === 0 ? 0 : arr.reduce((a,v)=>a+v, 0)/arr.length;
+export const vcomp = (a,b,m) => a.map((v,i) => Array.isArray(v)?vcomp(v,b[i],m):b[i]!=null?(m==2?v*b[i]:m==1?v-b[i]:v+b[i]):v);
 export const stddev = arr => Math.pow(vcomp(Array(arr.length).fill(-mean(arr)),arr).map((v)=>Math.pow(v,2)).reduce((a,b)=>a+b) / (arr.length - 1), 0.5);
 export const unique = arr => arr.length === 0 ? [] : Object.keys(arr.reduce((a,v)=>Object.assign(a, {[v]: 1}), {}));
 export const concat = arr => arr.length === 0 ? [] : arr.reduce((a,v)=>a.concat(v), []);
@@ -41,8 +42,8 @@ const inbounds = (point, bounds) => point[0] >= bounds[0][0] && point[0] <= boun
 const createSVG = (container, bounds =[[0, 1], [0, 1]], ratio=1) => {
 	const w = Math.floor(container.getBoundingClientRect().width) - 1;
 	const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-	svg.setAttribute("width", w);
-	svg.setAttribute("height", w*ratio);
+	svg.setAttribute('width', w);
+	svg.setAttribute('height', w*ratio);
 	svg.dataset.width = w;
 	svg.dataset.height = w*ratio;
 	container.appendChild(svg);
@@ -52,8 +53,8 @@ const createSVG = (container, bounds =[[0, 1], [0, 1]], ratio=1) => {
 const createCanvas = (container, bounds=[[0, 1], [0, 1]], ratio=1) => {
 	const w = Math.floor(container.getBoundingClientRect().width) - 1;
 	const canvas = document.createElement('canvas');
-	canvas.setAttribute("width", w);
-	canvas.setAttribute("height", w*ratio);
+	canvas.setAttribute('width', w);
+	canvas.setAttribute('height', w*ratio);
 	canvas.dataset.width = w;
 	canvas.dataset.height = w*ratio;
 	container.appendChild(canvas);
@@ -94,9 +95,15 @@ const plot_types = [
 		label: 'Lines',
 		input: {y: ['cont']},
 		draw: (draw, data, x) => {
-			const opacity = 0.1;
-			Object.keys(data[0]).forEach(i=>draw.line(data.map(step => step[i]), color_cycle[0], false, x, opacity));
-			draw.line(data.map(mean), color_cycle[0], false, x, 1);
+			const opacity = 0.1/(0.1 + Math.log(data[0].length));
+			const mean_line = data.map(mean);
+			if (data[0].length > 100) {
+				const std = data.map(stddev);
+				const points = mean_line.map((m,i) => [x + i, m - std[i]]).concat(mean_line.map((m,i) => [x + (mean_line.length - 1 - i), mean_line[mean_line.length - 1 - i] + std[mean_line.length - 1 - i]]));
+				draw.polygon(points, color_cycle[0], 0.1);
+			} else
+				Object.keys(data[0]).forEach(i=>draw.line(data.map(step => step[i]), color_cycle[0], false, x, opacity));
+			draw.line(mean_line, color_cycle[0], false, x, 1);
 		},
 	},
 	{
@@ -171,8 +178,8 @@ const svg_draw = (svg, bounds=[[0, 1], [0, 1]], dims=[svg.dataset.width, svg.dat
 	filled_line: function (line, prev, offset=0) {
 		const current = prev.slice();
 		line.forEach(v=>current[v[0]]+=v[1]);
-		this.polygon(prev.map((y,x)=>[(offset+x-bounds[0][0])*scale[0], (bounds[1][1]-y)*scale[1]])
-			.concat(current.slice().reverse().map((y,x)=>[(offset+current.length-1-x)*scale[0], (bounds[1][1]-y)*scale[1]])), line[0][2], 0.5, 'proportion');
+		this.polygon(prev.map((y,x)=>[offset+x, y])
+			.concat(current.slice().reverse().map((y,x)=>[(offset+current.length-1-x), y])), line[0][2], 0.5, 'proportion');
 		return current;
 	},
 	line_x: function (line, color) {
@@ -205,19 +212,19 @@ const svg_draw = (svg, bounds=[[0, 1], [0, 1]], dims=[svg.dataset.width, svg.dat
 		this.polyline(points, stroke, 1, classname);
 	},
 	rect: function (x, y, width, height, fill=[0, 0, 0], opacity=1, props={}, classname='') {
-		this.element("rect", {x, y, width, height, fill: `rgb(${fill.join(',')})`, opacity, class: classname, ...props});
+		this.element('rect', {x, y, width, height, fill: `rgb(${fill.join(',')})`, opacity, class: classname, ...props});
 	},
-	circle: function (x, y, r=3, fill=[0, 0, 0], opacity=1, classname="") {
-		this.element("circle", {cx: x, cy: y, r, fill: `rgb(${fill.join(',')})`, opacity, class: classname});
+	circle: function (x, y, r=3, fill=[0, 0, 0], opacity=1, classname='') {
+		this.element('circle', {cx: x, cy: y, r, fill: `rgb(${fill.join(',')})`, opacity, class: classname});
 	},
-	polyline: function (points, stroke=[0, 0, 0], opacity=1, classname="", props={}) {
- 		this.element('polyline', {points: points.map(v=>v.map(v=>round(v,3)).join(',')).join(' '), fill: "none", stroke: `rgb(${stroke.join(',')})`, opacity, "class": classname, ...props});
+	polyline: function (points, stroke=[0, 0, 0], opacity=1, classname='', props={}) {
+ 		this.element('polyline', {points: points.map(v=>v.map(v=>round(v,3)).join(',')).join(' '), fill: 'none', stroke: `rgb(${stroke.join(',')})`, opacity, 'class': classname, ...props});
 	},
-	polygon: function (points, fill=[0, 0, 0], opacity=1, classname="", info="", transform="") {
-		this.element("polygon", {points: points.map(v=>v.map(v=>round(v, 3)).join(',')).join(' '), fill: `rgb(${fill.join(',')})`, opacity, "class": classname, transform, "data-info": info});
+	polygon: function (points, fill=[0, 0, 0], opacity=1, classname='', info='', transform='') { // Decide if this scales the values or some other function
+		this.element('polygon', {points: points.map(([x,y])=>[(x-bounds[0][0])*scale[0], (bounds[1][1]-y)*scale[1]].join(',')).join(' '), fill: `rgb(${fill.join(',')})`, opacity, 'class': classname, transform, 'data-info': info});
 	},
-	text: function (text, x, y, classname="", transform="") {
-		const elem = this.element("text", {x, y, "class": classname, transform});
+	text: function (text, x, y, classname='', transform='') {
+		const elem = this.element('text', {x, y, 'class': classname, transform});
 		elem.textContent = text;
 	},
 	grid: function (gridres=40) {
@@ -279,10 +286,10 @@ const canvas_draw = (canvas, ctx, bounds=[[0, 1], [0, 1]], dims=[canvas.dataset.
 			ctx.strokeRect(x, y, width, height);
 		}
 	},
-	circle: function (x, y, r=3, fill=[0, 0, 0], opacity=1, classname="") {
-		//this.element("circle", {cx: x, cy: y, r, fill, opacity, class: classname});
+	circle: function (x, y, r=3, fill=[0, 0, 0], opacity=1, classname='') {
+		//this.element('circle', {cx: x, cy: y, r, fill, opacity, class: classname});
 	},
-	polyline: function (points, stroke=[0, 0, 0], opacity=1, classname="", info="") {
+	polyline: function (points, stroke=[0, 0, 0], opacity=1, classname='', info='') {
 		ctx.beginPath();
 		ctx.moveTo(points[0][0], points[0][1]);
 		points.slice(1).forEach(v => ctx.lineTo(v[0], v[1]));
@@ -290,7 +297,7 @@ const canvas_draw = (canvas, ctx, bounds=[[0, 1], [0, 1]], dims=[canvas.dataset.
 		ctx.stroke();
 		ctx.closePath();
 	},
-	polygon: function (points, fill=[0, 0, 0], opacity=1, classname="", info="", transform="") {
+	polygon: function (points, fill=[0, 0, 0], opacity=1, classname='', info='', transform='') {
 		ctx.beginPath();
 		ctx.moveTo(points[0][0], points[0][1]);
 		points.slice(1).forEach(v => ctx.lineTo(v[0], v[1]));
