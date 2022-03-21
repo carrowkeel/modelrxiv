@@ -166,7 +166,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 				break;
 			default:
 				const option_fields = fieldsFromForm(input_params, query);
-				elem.innerHTML = `<h2>${entry.title}</h2><div class="authors">${entry.authors || ''}. ${entry.doi ? `<a href="https://doi.org/${entry.doi}" target="_blank">doi:${entry.doi}</a>` : ''}</div><div class="description shorten">${entry.description || ''}</div><div class="tabs"><div class="result-tab menu"></div><div class="parameters-menu menu show multiple-tabs"><div class="tabs"><a data-tab="parameters" class="selected">Parameters</a><a data-tab="presets">Presets</a></div><div data-tab-content="parameters" class="form show">${option_fields}<div class="clear space"><a class="button" data-action="grid" title="Meta analysis using selected parameters">Grid</a><a data-action="update" class="button">Update</a><div class="clear"></div></div></div><div data-tab-content="presets">${presetHTML}</div></div><a class="fright" data-action="parameters-menu" title="Parameters" data-icon="f">Parameters</a>${['js', 'py'].includes(entry.framework) ? '<a class="fright" data-action="restart" title="Restart" data-icon="r">Restart</a><a class="fright" data-action="start" title="Start/Pause" data-icon="p">Run</a>' : ''}<a class="${!query.code && !query.pseudocode ? 'selected' : ''}" href="${uri}">Model</a>${entry.private ? `<a href="/edit/${entry.model_id}">Edit</a><a data-action="publish">Publish</a>` : ''}<a class="${query.code ? 'selected' : ''}" href="${uri}/code/latest">Code</a>${entry.pseudocode ? `<a class="${query.pseudocode ? 'selected' : ''}" href="${uri}/pseudocode/latest">Equations</a>` : ''}</div>${query.code || query.pseudocode ? '<div class="editor line-numbers"><div class="watermark">Powered by Prism.js</div><pre><code class="language-javascript"></code></pre></div>' : '<div class="plots" data-empty="Initiate model to load results"></div>'}`;
+				elem.innerHTML = `<h2>${entry.title}</h2><div class="authors">${entry.authors || ''}. ${entry.doi ? `<a href="https://doi.org/${entry.doi}" target="_blank">doi:${entry.doi}</a>` : ''}</div><div class="description shorten">${entry.description || ''}</div><div class="tabs"><div class="result-tab menu"></div><div class="parameters-menu menu show multiple-tabs"><div class="tabs"><a data-tab="parameters" class="selected">Parameters</a><a data-tab="presets">Presets</a><a data-tab="saved">Saved</a></div><div data-tab-content="parameters" class="form show">${option_fields}<div class="clear space"><a class="button" data-action="grid" title="Meta analysis using selected parameters">Grid</a><a data-action="update" class="button">Update</a><a data-action="save" class="button">Save</a><div class="clear"></div></div></div><div data-tab-content="presets">${presetHTML}</div><div data-tab-content="saved"></div></div><a class="fright" data-action="parameters-menu" title="Parameters" data-icon="f">Parameters</a>${['js', 'py'].includes(entry.framework) ? '<a class="fright" data-action="restart" title="Restart" data-icon="r">Restart</a><a class="fright" data-action="start" title="Start/Pause" data-icon="p">Run</a>' : ''}<a class="${!query.code && !query.pseudocode ? 'selected' : ''}" href="${uri}">Model</a>${entry.private ? `<a href="/edit/${entry.model_id}">Edit</a><a data-action="publish">Publish</a>` : ''}<a class="${query.code ? 'selected' : ''}" href="${uri}/code/latest">Code</a>${entry.pseudocode ? `<a class="${query.pseudocode ? 'selected' : ''}" href="${uri}/pseudocode/latest">Equations</a>` : ''}</div>${query.code || query.pseudocode ? '<div class="editor line-numbers"><div class="watermark">Powered by Prism.js</div><pre><code class="language-javascript"></code></pre></div>' : '<div class="plots" data-empty="Initiate model to load results"></div>'}`;
 				elem.dispatchEvent(new CustomEvent('init', {detail: {group: true}}));
 				break;
 		}
@@ -188,8 +188,8 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 					Prism.highlightElement(elem.querySelector('.editor code'));
 					break;
 				case elem.querySelector('.plots') !== null:
-					storage.params = numericize(readForm(elem.querySelector('.parameters-menu .form'), defaultsFromInput(entry.input_params)));
 					const plots_container = elem.querySelector('.plots');
+					storage.params = numericize(readForm(elem.querySelector('.parameters-menu .form'), defaultsFromInput(entry.input_params)));
 					await Promise.all(plotsFromOutput(entry).map(plot => {
 						if (!plots_container.querySelector(`[data-name="${plot.name}"]`)) {
 							const group = document.createElement('div');
@@ -208,7 +208,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 				storage.step_module = entry.framework === 'js' ? await import(`${entry.module_url}${e.detail?.reload ? `?${new Date().getTime()}` : ''}`) : (entry.framework === 'py' ? await pythonModuleWrapper(entry, e.detail?.reload) : false);
 			}
 			if (!storage.loop || e.detail?.reset) {
-				e.target.dispatchEvent(new Event('init'));
+				e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false}}));
 				const stats = []; // Rename
 				if (storage.timeout)
 					clearTimeout(storage.timeout);
@@ -228,6 +228,18 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			e.target.dataset.state = 'running';
 			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'P');
 		}],
+		['[data-module="model"]', 'save', e => {
+			const plots_container = elem.querySelector('.plots');
+			const id = Math.round(1e7*Math.random());
+			const cloned = plots_container.cloneNode(true);
+			cloned.setAttribute('class', 'archived-plots');
+			cloned.dataset.saved = id;
+			plots_container.parentElement.appendChild(cloned);
+			const button = document.createElement('div');
+			button.classList.add('preset');
+			button.innerHTML = `<a data-saved="${id}" data-type="dynamics" title="">Saved plots</a>`;
+			elem.querySelector('[data-tab-content="saved"]').appendChild(button);
+		}],
 		['[data-module="model"]', 'pause', e => {
 			e.target.dataset.state = 'paused';
 			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'p');
@@ -236,6 +248,11 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			e.target.dataset.state = 'stopped';
 			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'p');
 			delete storage.loop;
+		}],
+		['a[data-saved]', 'click', e => {
+			const id = e.target.dataset.saved;
+			e.target.classList.toggle('selected');
+			elem.querySelector(`.archived-plots[data-saved="${id}"]`).classList.toggle('show');
 		}],
 		['.menu [data-tab]', 'click', e => {
 			const menu = e.target.closest('.menu');
@@ -265,6 +282,9 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 		}],
 		['[data-action="restart"]', 'click', e => {
 			elem.dispatchEvent(new CustomEvent('run', {detail: {reset: true}}));
+		}],
+		['[data-action="save"]', 'click', e => {
+			elem.dispatchEvent(new Event('save'));
 		}],
 		['[data-action="run_model"]', 'click', e => {
 			const menu = e.target.closest('.data-menu');

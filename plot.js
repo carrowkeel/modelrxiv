@@ -330,7 +330,7 @@ const canvas_draw = (canvas, ctx, bounds=[[0, 1], [0, 1]], dims=[canvas.dataset.
 export const plot = (env, {job}, elem, storage={}) => ({
 	render: async () => {
 		elem.classList.add('plot');
-		elem.innerHTML = `<div class="header"><div class="settings-menu menu"><a data-action="close">Hide</a><a data-action="split">Split</a><a data-action="save">Save SVG</a><a data-action="export">Export</a></div><a data-icon="f" data-action="settings-menu" class="settings fright"></a><div class="figure-selector"></div></div><div class="console"></div><div class="legend"></div><div class="draw_area">${job ? `<div class="overlay" data-job="${job.id}"></div>` : ''}</div>`;
+		elem.innerHTML = `<div class="header"><div class="settings-menu menu"><a data-action="close">Hide</a><a data-action="split">Split</a><a data-action="save">Save SVG</a><a data-action="export">Export</a></div><a data-icon="f" data-action="settings-menu" class="settings fright"></a><div class="figure-selector"></div></div><div class="legend"></div><div class="draw_area">${job ? `<div class="overlay" data-job="${job.id}"></div>` : ''}</div>`;
 		elem.dispatchEvent(new Event('done'));
 	},
 	hooks: [
@@ -342,7 +342,7 @@ export const plot = (env, {job}, elem, storage={}) => ({
 			plot_element.dataset.plot = plot.type; // Fix
 			for (const prop in plot)
 				plot_element.dataset[prop] = typeof plot[prop] !== 'string' ? JSON.stringify(plot[prop]) : plot[prop];
-			plot_element.innerHTML = `<div class="axis-label label-x">${formatLabel(plot.labels.x)}</div><div class="axis-label label-y">${formatLabel(plot.labels.y)}</div>${plot.xbounds[0] === plot.ybounds[0] ? `<div class="axis-tick min">${shorten(plot.xbounds[0])}</div>` : `<div class="axis-tick xmin">${shorten(plot.xbounds[0])}</div><div class="axis-tick ymin editable" title="Edit y-axis">${shorten(plot.ybounds[0])}</div>`}<div class="axis-tick xmax">${shorten(plot.xbounds[1])}</div><div class="axis-tick ymax editable" title="Edit y-axis">${shorten(plot.ybounds[1])}</div></div>`;
+			plot_element.innerHTML = `<div class="console"></div><div class="crosshair"></div><div class="axis-label label-x">${formatLabel(plot.labels.x)}</div><div class="axis-label label-y">${formatLabel(plot.labels.y)}</div>${plot.xbounds[0] === plot.ybounds[0] ? `<div class="axis-tick min">${shorten(plot.xbounds[0])}</div>` : `<div class="axis-tick xmin">${shorten(plot.xbounds[0])}</div><div class="axis-tick ymin editable" title="Edit y-axis">${shorten(plot.ybounds[0])}</div>`}<div class="axis-tick xmax">${shorten(plot.xbounds[1])}</div><div class="axis-tick ymax editable" title="Edit y-axis">${shorten(plot.ybounds[1])}</div></div>`;
 			elem.querySelector('.draw_area').appendChild(plot_element);
 			const bounds = [plot.xbounds, plot.ybounds];
 			const draw = plot.type === 'proportion_plot' || plot.draw === 'canvas' ? createCanvas(plot_element, bounds) : createSVG(plot_element, bounds);
@@ -432,7 +432,15 @@ export const plot = (env, {job}, elem, storage={}) => ({
 				bounds[0][0] + (bounds[0][1] - bounds[0][0]) * e.offsetX / display.getBoundingClientRect().width,
 				bounds[1][0] + (bounds[1][1] - bounds[1][0]) * (1 - e.offsetY / display.getBoundingClientRect().height)
 			].map(v => round(v, 3));
-			plot.closest('.plot').querySelector('.console').innerHTML = `x: ${x}, y: ${y}`;
+			const crosshair = plot.querySelector('.crosshair');
+			crosshair.classList.add('show');
+			crosshair.style.left = (e.offsetX - 5) + 'px';
+			crosshair.style.top = (e.offsetY - 5) + 'px';
+			plot.querySelector('.console').innerHTML = `x: ${x}, y: ${y}`;
+		}],
+		['[data-plot*="line"]', 'mouseleave', e => {
+			e.target.querySelector('.crosshair').classList.remove('show');
+			e.target.querySelector('.console').innerHTML = '';
 		}],
 		['[data-plot="hist_2d"]', 'mouseenter', e => {
 			const plot = e.target;
