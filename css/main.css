@@ -569,7 +569,7 @@ polygon.proportion:hover {
 }
 .plot .legend-hover {
 	top: 5px;
-	right: 5px;
+	right: -140px;
 }
 .plot .console {
 	position: absolute;

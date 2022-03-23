@@ -157,6 +157,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 						outputs: entry.result_params
 					}, params: user_params}}));
 					plot_module.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: squares}}));
+					break;
 				}
 			});
 			break;

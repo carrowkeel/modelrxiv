@@ -97,7 +97,7 @@ const plot_types = [
 		draw: (draw, data, x) => {
 			const opacity = 0.1/(0.1 + Math.log(data[0].length));
 			const mean_line = data.map(mean);
-			if (data[0].length > 100) {
+			if (data[0].length >= 50) {
 				const std = data.map(stddev);
 				const points = mean_line.map((m,i) => [x + i, m - std[i]]).concat(mean_line.map((m,i) => [x + (mean_line.length - 1 - i), mean_line[mean_line.length - 1 - i] + std[mean_line.length - 1 - i]]));
 				draw.polygon(points, color_cycle[0], 0.1);
