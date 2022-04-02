@@ -418,8 +418,6 @@ canvas.dynamic {
 	padding: 15px 0;
 	display: none;
 	width: 100%;
-	position: absolute;
-	left: 0;
 }
 .plot {
 	position: relative;
@@ -1163,6 +1161,40 @@ h2 a.tag {
 	opacity: 0.5;
 	right: 10px;
 	font-size: 14px;
+}
+.toolbar {
+	display: none;
+	position: fixed;
+	z-index: 1;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	background: #fff;
+	box-shadow: 0 -2px 5px #00000033;
+	height: 32px;
+	transition: height 0.5s ease;
+}
+.toolbar.dragover {
+	background: #fff7ea;
+}
+.toolbar:hover {
+	height: 86px;
+	padding: 10px 0;
+}
+.toolbar:hover .plot {
+	display: block;
+}
+.toolbar .plot {
+	width: 56px;
+	padding: 0;
+	margin: 0 10px;
+}
+.toolbar .plot .header, .toolbar .plot .axis-tick, .toolbar .plot .axis-label {
+	display: none;
+}
+.toolbar .plot svg {
+	width: 56px;
+	height: 56px;
 }
 footer {
 	clear: both;

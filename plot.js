@@ -39,11 +39,12 @@ const shorten = (n) => {
 };
 const inbounds = (point, bounds) => point[0] >= bounds[0][0] && point[0] <= bounds[0][1] && point[1] >= bounds[1][0] && point[1] <= bounds[1][1];
 
-const createSVG = (container, bounds =[[0, 1], [0, 1]], ratio=1) => {
+const createSVG = (container, bounds = [[0, 1], [0, 1]], ratio=1) => {
 	const w = Math.floor(container.getBoundingClientRect().width) - 1;
 	const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 	svg.setAttribute('width', w);
 	svg.setAttribute('height', w*ratio);
+	svg.setAttribute('viewBox', `0 0 ${w} ${w*ratio}`);
 	svg.dataset.width = w;
 	svg.dataset.height = w*ratio;
 	container.appendChild(svg);

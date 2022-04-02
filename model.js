@@ -14,7 +14,7 @@ const fieldsFromForm = (input_params, query) => {
 				case 'cont':
 					return `<input type="text" data-type="${type}" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}"><input type="text" class="range" name="${name}" value="${range[0]}" title="${description} range start"><input type="text" class="range" name="${name}" value="${range[1]}" title="${description} range end"><input type="text" class="range" name="${name}" value="5" title="${description} resolution (2^x)">`;
 				case 'disc':
-					return `<select class="value" data-type="cont" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">${values.map(flag => `<option value="${flag.name}">${flag.name}</option>`).join('')}</select>`;
+					return values ? `<select class="value" data-type="cont" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">${values.map(flag => `<option value="${flag.name}">${flag.name}</option>`).join('')}</select>` : `<input type="text" data-type="${type}" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">`;
 				case 'json':
 					return `<input type="text" data-type="json" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">`;
 			}

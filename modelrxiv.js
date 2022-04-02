@@ -14,7 +14,7 @@ const loadScript = (script, type="script") => new Promise(resolve => {
 const parseJSON = (text, default_value={}) => {
 	try {
 		if (text === null)
-			throw 'JSON string missing'; // For cases where null is returned such as localStorage
+			throw 'JSON string missing';
 		return JSON.parse(text);
 	} catch (e) {
 		return default_value;
@@ -23,8 +23,8 @@ const parseJSON = (text, default_value={}) => {
 
 const queryFromPath = (defaults = {}) => numericize(window.location.pathname.substring(1).split('/').reduce((a,v,i,arr)=>i%2===0&&arr[i+1]!==undefined?Object.assign(a, {[v]: arr[i+1]}):a, defaults));
 
-const addModule = (elem, name, options={}) => new Promise((resolve, reject) => {
-	const module = elem.appendChild(document.createElement('div'));
+const addModule = (elem, name, options={}, replace_element=false) => new Promise((resolve, reject) => {
+	const module = replace_element ? elem : elem.appendChild(document.createElement('div'));
 	module.dataset.module = name;
 	Object.keys(options).forEach(k => typeof options[k] !== 'object' ? module.dataset[k] = options[k] : 0);
 	module.dispatchEvent(new CustomEvent('render', {detail: {options}}));
@@ -322,7 +322,7 @@ const init = async () => {
 	const env = {static_pages: {login: 'Login', register: 'Register', privacy: 'Privacy', terms: 'Terms', contribute: 'Contribute'}, db: staticDB({uri: 'https://modelrxiv.org'}), processes: {}, timeouts: {}};
 	addHooks(window, hooks(env));
 	await auth(env);
-	import('./apc.js').then(apc => apc.init(document.querySelector('.apocentric'), {getCredentials, worker_script: '/worker.js', url: 'wss://apc.modelrxiv.org', threads: navigator.hardwareConcurrency, frameworks: ['js', 'py']}));
+	addModule(document.querySelector('.apocentric'), 'apc', {options: {getCredentials, worker_script: '/worker.js', url: 'wss://apc.modelrxiv.org', threads: navigator.hardwareConcurrency, frameworks: ['js', 'py']}}, true);
 	window.addEventListener('popstate', e => {
 		if (e.state.page)
 			navigate(env, e.state.page, true);
