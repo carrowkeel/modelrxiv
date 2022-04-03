@@ -233,6 +233,9 @@ a.logo {
 	color: #333;
 	line-height: 22px;
 }
+.resources .item.rtc {
+	background: rgba(0, 200, 0, 0.1);
+}
 [data-job] .progress {
 	float: left;
 	width: 70%;
@@ -544,7 +547,7 @@ polygon.proportion:hover {
 	background: #fafafa;
 	white-space: nowrap;
 	height: 29px;
-	overflow-y: hidden;
+	/*overflow-y: hidden;*/
 }
 .plot .figure-selector:hover {
 	height: auto;
