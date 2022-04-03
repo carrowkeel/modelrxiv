@@ -228,6 +228,28 @@ const hooks = env => [
 		if (e.keyCode !== 13)
 			return;
 		e.target.closest('.filtered-list').dispatchEvent(new Event('refresh'));
+	}],
+	['.toolbar, .toolbar *', 'dragover', e => {
+		const toolbar = e.target.closest('.toolbar');
+		e.preventDefault();
+		toolbar.classList.add('dragover');
+	}],
+	['.toolbar, .toolbar *', 'dragleave', e => {
+		const toolbar = e.target.closest('.toolbar');
+		toolbar.classList.remove('dragover');
+	}],
+	['.toolbar, .toolbar *', 'drop', e => {
+		const toolbar = e.target.closest('.toolbar');
+		e.preventDefault();
+		const dragged = document.querySelector('.plot.dragged');
+		const group = document.createElement('div');
+		group.classList.add('group');
+		const clone = dragged.cloneNode(true);
+		group.appendChild(clone);
+		toolbar.appendChild(group);
+		toolbar.classList.remove('dragover');
+		dragged.classList.remove('dragged');
+		clone.classList.remove('dragged');
 	}]
 ];
 
