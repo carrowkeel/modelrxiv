@@ -279,23 +279,23 @@ a.logo {
 	font-size: 15px;
 	padding: 4px;
 }
-.user-menu .connect {
+.user-menu .state-change {
 	padding: 3px 10px;
 	background: #eee;
 	font-size: 15px;
 }
-.user-menu .connect a:before {
+.user-menu .state-change a:before {
 	margin-right: 6px;
 	font-size: 18px;
 	float: left;
 }
-.user-menu .connect a {
+.user-menu .state-change a {
 	color: #333;
 }
-.user-menu .connect a:hover {
+.user-menu .state-change a:hover {
 	color: #666;
 }
-.user-menu .connect a[data-status="connected"] {
+.user-menu .state-change[data-status="connected"] a {
 	color: #497930;
 }
 .main {
