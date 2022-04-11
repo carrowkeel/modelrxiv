@@ -144,23 +144,23 @@ const wsConnect = (module, websocket_url, options, receiving) => new Promise((re
 	ws.connect(`${websocket_url}/?${params.toString()}`);
 });
 
-export const ws = ({options, local}, storage={receiving: [], status: 'disconnected'}) => ({
+export const ws = (module, {options, local}, storage={receiving: [], status: 'disconnected'}) => ({
 	hooks: [
-		['init', (module) => {
-			module.emit('connect', module);
+		['init', () => {
+			module.emit('connect');
 		}],
-		['connect', (module) => {
+		['connect', () => {
 			if (storage.ws && storage.ws.readyState > 1)
 				return; // Possibly check if status is "connecting"
 			const params = new URLSearchParams({authorization: options.credentials.token, ...local});
 			storage.status = 'connecting';
 			storage.ws = wsConnect(module, `${options.url}/?${params.toString()}`);
 		}],
-		['connected', (module) => {
+		['connected', () => {
 			storage.status = 'connected';
 			module.emit('send', {type: 'connected', data: local});
 		}],
-		['disconnected', (module) => {
+		['disconnected', () => {
 			if (storage.status === 'connected') // Check why it disconnected
 				module.emit('connect', module);
 			storage.status = 'disconnected';

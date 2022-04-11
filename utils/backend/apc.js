@@ -86,9 +86,9 @@ const workerQueue = (options, workers=Array.from(new Array(options.threads)), qu
 	return deploy(workers, i);
 };
 
-const addResource = (resources, resource) => {
+const addResource = (apc, resources, resource) => {
 	Object.keys(resources).filter(connection_id => resources[connection_id].machine_id === resource.machine_id).forEach(connection_id => delete resources[connection_id]);
-	resources[resource.connection_id] = require('./add_module').addModule('resource', {resource, frameworks: resource.frameworks, machine_id: resource.machine_id, connection_id: resource.connection_id});
+	resources[resource.connection_id] = require('./add_module').addModule('resource', {apc, resource, frameworks: resource.frameworks, machine_id: resource.machine_id, connection_id: resource.connection_id});
 	return resources[resource.connection_id];
 };
 
@@ -99,7 +99,7 @@ const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
 			storage.queue = workerQueue(options);
 			storage.local_queue = workerQueue(elem, options);
 			const local_resource = {machine_id: options.id, type: 'node', name: options.name, capacity: request ? 0 : threads, cost: 0, time: 100, frameworks: options.frameworks.join(',')};
-			addResource(storage.resources, Object.assign({}, local_resource, {connection_id: 'local'}));
+			addResource(module, storage.resources, Object.assign({}, local_resource, {connection_id: 'local'}));
 			if (request) {
 				// run job and connect to send results, think how to combine with rtc which requires a longer connection process
 				// await processRequest(options, queue, request).then(result => require('./ws').wsConnectSend(websocket_url, options, request.user, request.request_id, result));
