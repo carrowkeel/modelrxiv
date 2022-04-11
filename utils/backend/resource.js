@@ -1,27 +1,22 @@
 
-const resource = ({resource, settings, queue}, storage={}) => ({
-	render: async () => {
-
-	},
+const resource = (module, {resource, settings, queue}, storage={}) => ({
 	hooks: [
-		['init', module => { // May not be necessary
+		['init', () => { // May not be necessary
 			const threads = settings ? settings.used : (resource.cost > 0 ? 0 : resource.capacity);
 			storage.used = threads;
 		}],
-		['[data-module="resource"]', 'establishrtc', async e => {
+		['establishrtc', () => {
 			const connection_id = e.target.dataset.connection_id;
-			await addModule(e.target, 'rtc', {connection_id});
-			e.target.querySelector('[data-module="rtc"]').dispatchEvent(new Event('connect'));
+			storage.rtc = addModule('rtc', {connection_id});
+			storage.rtc.emit('connect', module);
 		}],
-		['[data-module="resource"]', 'processrtc', async e => {
+		['processrtc', rtc_data => {
 			const connection_id = e.target.dataset.connection_id;
-			if (!e.target.querySelector('[data-module="rtc"]') && e.detail.type === 'offer') // Only offer can initiate rtc, need to check if this will make ice candidates get lost
-				addModule(e.target, 'rtc', {connection_id, rtc_data: e.detail});
-			else
-				e.target.querySelector('[data-module="rtc"]').dispatchEvent(new CustomEvent('receivedata', {detail: e.detail}));
-			
+			if (!e.target.querySelector('[data-module="rtc"]') && e.detail.type === 'offer')
+				storage.rtc = addModule('rtc', {connection_id});
+			storage.rtc.emit('receivedata', rtc_data);
 		}],
-		['[data-module="resource"]', 'send', e => {
+		['send', e => {
 			if (e.target.dataset.connection_id === 'local')
 				return elem.dispatchEvent(new CustomEvent('message', {detail: {message: e.detail}}));
 			if (e.target.querySelector('[data-module="rtc"]') && e.target.querySelector('[data-module="rtc"]').dataset.status === 'connected')
@@ -31,7 +26,7 @@ const resource = ({resource, settings, queue}, storage={}) => ({
 			// Decide where to handle problems with data unsuitable to be sent via WebSocket (i.e. too big)
 			ws.dispatchEvent(new CustomEvent('send', {detail: Object.assign(e.detail, {user: e.target.dataset.connection_id})}));
 		}],
-		['[data-module="resource"]', 'message', e => {
+		['message', e => {
 			const message = e.detail.message;
 			switch(message.type) {
 				case 'rtc':
@@ -43,23 +38,10 @@ const resource = ({resource, settings, queue}, storage={}) => ({
 				}
 			}
 		}],
-		['[data-module="rtc"]', 'connected', e => {
-			elem.classList.add('rtc');
-		}],
 		['.apocentric', 'resourcestatus', e => {
 			const active_threads = e.detail.workers.filter(v => v !== undefined).length;
 			const used = active_threads / e.detail.threads;
 			e.target.closest('.apocentric').querySelector('.resources-icon').dataset.notify = active_threads;
-		}],
-		['.resources-menu .name', 'click', e => {
-			elem.dispatchEvent(new Event('establishrtc'));
-			//e.target.closest('[data-connection_id]').classList.toggle('disabled');
-		}],
-		['.resources-menu .threads', 'focusout', e => {
-			e.target.closest('[data-module="resource"]').dataset.used = e.target.value;
-			// const machines = Array.from(e.target.closest('.apocentric').querySelectorAll('[data-machine_id]')).reduce((a,machine) => Object.assign(a, {[machine.dataset.machine_id]: {used: +(machine.querySelector('input.threads').value)}}), {});
-			// Update settings in apc
-			// cachedSettings({machines});
 		}]
 	]
 });

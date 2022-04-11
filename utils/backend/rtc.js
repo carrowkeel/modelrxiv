@@ -143,11 +143,10 @@ const process = async (resource, user, connection, ice_queue, rtc_data) => {
 };
 
 // Missing: configuration for local STUN server
-export const rtc = (env, {connection_id: ws_connection_id, rtc_data}, elem, storage={ice_queue: [], receiving: []}) => ({
+export const rtc = (module, {connection_id: ws_connection_id, rtc_data}, elem, storage={ice_queue: [], receiving: []}) => ({
 	hooks: [
-		['init', (module, rtc_data) => {
-			if (rtc_data)
-				module.emit('receivedata', rtc_data);
+		['init', () => {
+
 		}],
 		['connect', (resource) => {
 			storage.peer_connection = createPeerConnection(elem, resource, ws_connection_id, storage.ice_queue, storage.receiving); // Find a way to have this not in storage

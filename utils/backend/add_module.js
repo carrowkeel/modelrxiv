@@ -6,13 +6,13 @@ const addHooks = (emitter, events) => {
 };
 
 const addModule = (name, options={}) => {
-	const emitter = new require('events')();
-	const module = require(`./${name}`)[name](options);
+	const EventEmitter = require('events');
+	const module = new EventEmitter();
+	const module_data = require(`./${name}`)[name](module, options);
 	module.dataset = {};
-	module.dataset.module = name;
 	Object.keys(options).forEach(k => typeof options[k] !== 'object' ? module.dataset[k] = options[k] : 0);
-	addHooks(module, module.hooks);
-	module.emit('init', module);
+	addHooks(module, module_data.hooks);
+	module.emit('init');
 	return module;
 };
 

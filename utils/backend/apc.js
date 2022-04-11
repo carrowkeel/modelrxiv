@@ -92,7 +92,7 @@ const addResource = (resources, resource) => {
 	return resources[resource.connection_id];
 };
 
-const apc = ({options, request}, elem, storage={resources: {}}) => ({
+const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
 	events: [
 		['init', () => {
 			options.id = getID();
