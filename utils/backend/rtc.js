@@ -144,42 +144,41 @@ const process = async (resource, user, connection, ice_queue, rtc_data) => {
 
 // Missing: configuration for local STUN server
 export const rtc = (env, {connection_id: ws_connection_id, rtc_data}, elem, storage={ice_queue: [], receiving: []}) => ({
-	render: async () => {
-		if (rtc_data)
-			elem.dispatchEvent(new CustomEvent('receivedata', {detail: rtc_data}));
-		elem.dispatchEvent(new Event('done'));
-	},
 	hooks: [
-		['[data-module="rtc"]', 'connect', async e => {
-			const resource = e.target.closest('[data-module="resource"]');
+		['init', (module, rtc_data) => {
+			if (rtc_data)
+				module.emit('receivedata', rtc_data);
+		}],
+		['connect', (resource) => {
 			storage.peer_connection = createPeerConnection(elem, resource, ws_connection_id, storage.ice_queue, storage.receiving); // Find a way to have this not in storage
 			sendOffer(resource, ws_connection_id, storage.peer_connection);
 		}],
-		['[data-module="rtc"]', 'receivedata', e => {
+		['receivedata', data => {
 			const resource = e.target.closest('[data-module="resource"]');
 			if (!storage.peer_connection)
 				storage.peer_connection = createPeerConnection(elem, resource, ws_connection_id, storage.ice_queue, storage.receiving, false);
-			process(resource, ws_connection_id, storage.peer_connection, storage.ice_queue, e.detail);
+			process(resource, ws_connection_id, storage.peer_connection, storage.ice_queue, data);
 		}],
-		['[data-module="rtc"]', 'channelconnected', e => { // Update connection state
-			storage.channel = e.detail.channel;
-			elem.dataset.status = 'connected';
-			elem.dispatchEvent(new Event('connected'));
+		['channelconnected', (channel) => { // Update connection state
+			storage.channel = channel;
+			storage.status = 'connected';
+			// connected event for resource
 		}],
-		['[data-module="rtc"]', 'channeldisconnected', e => {
-			elem.dataset.status = 'disconnected';
+		['channeldisconnected', e => {
+			storage.status = 'disconnected';
 		}],
-		['[data-module="rtc"]', 'send', e => {
+		['send', data => {
 			try {
-				rtcSend(storage.channel, e.detail);
+				rtcSend(storage.channel, data);
 			} catch (e) {
 				console.log(e);
 			}
 		}],
-		['[data-module="rtc"]', 'message', e => {
-			elem.closest('[data-module="resource"]').dispatchEvent(new CustomEvent('message', {detail: e.detail}));
+		['message', message => {
+			const resource = storage.resource;
+			resource.emit('message', message);
 		}],
-		['[data-module="rtc"]', 'disconnect', e => {
+		['disconnect', () => {
 			storage.peer_connection.close();
 		}]
 	]
