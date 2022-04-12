@@ -40,7 +40,9 @@ test <- function(script) {
 }
 
 process_job <- function(request) {
-	if(any(names(request$fixed_params) == 'test')) {
+	if(!any(names(request) == 'variable_params')) {
+		return(run_dynamics(request$script, request$fixed_params))
+	} else if(any(names(request$fixed_params) == 'test')) {
 		return(test(request$script))
 	} else {
 		return(run_params(request$script, request$fixed_params, request$variable_params))
@@ -62,11 +64,11 @@ main <- function() {
 	}
 }
 
-##main()
+main()
 
-dynamics_test <- function() {
-	params <- list(n=10, P=0.5, L=1.01, N=100, target_steps=100)
-	return(run_dynamics('test.R', params))
-}
+##dynamics_test <- function() {
+##	params <- list(n=10, P=0.5, L=1.01, N=100, target_steps=100)
+##	return(run_dynamics('test.R', params))
+##}
 
-dynamics_test()
+##dynamics_test()
