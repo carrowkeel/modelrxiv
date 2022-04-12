@@ -86,35 +86,57 @@ const workerQueue = (options, workers=Array.from(new Array(options.threads)), qu
 	return deploy(workers, i);
 };
 
-const addResource = (apc, resources, resource) => {
-	Object.keys(resources).filter(connection_id => resources[connection_id].machine_id === resource.machine_id).forEach(connection_id => delete resources[connection_id]);
+const processRequest = (options, queue, request, request_id, user) => new Promise(async (resolve, reject) => {
+	switch(options.mode) {
+		case 'slurm':
+			await require('fs/promises').writeFile(`${request_id}.request`, JSON.stringify(Object.assign(request, {credentials: options.credentials, request_id, user})));
+			require('child_process').exec(`sbatch --time=01:00:00 --mem=1G --ntasks=${options.machine.capacity} --wrap="node init.js --threads=${options.machine.capacity} --request=${request_id}.request;"`, err => {
+				if (err)
+					return reject();
+				return resolve();
+			});
+		case 'subprocess':
+		default:
+			return Promise.all(request.collection ? request.collection.map(batch => queue({framework: request.framework, sources: request.sources, fixed_params: request.fixed_params, variable_params: batch})) : [queue(request)]).then(result => {
+				return resolve(result);
+			});
+	}
+});
+
+const addResource = (apc, options, resources, resource, initial=false) => {
+	if (!initial && (resource.machine_id === options.id))
+		return;
+	Object.keys(resources).filter(connection_id => resources[connection_id].dataset.machine_id === resource.machine_id).forEach(connection_id => delete resources[connection_id]);
 	resources[resource.connection_id] = require('./add_module').addModule('resource', {apc, resource, frameworks: resource.frameworks, machine_id: resource.machine_id, connection_id: resource.connection_id});
 	return resources[resource.connection_id];
 };
 
 const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
-	events: [
+	hooks: [
 		['init', () => {
-			options.id = getID();
-			storage.queue = workerQueue(options);
-			storage.local_queue = workerQueue(elem, options);
-			const local_resource = {machine_id: options.id, type: 'node', name: options.name, capacity: request ? 0 : threads, cost: 0, time: 100, frameworks: options.frameworks.join(',')};
-			addResource(module, storage.resources, Object.assign({}, local_resource, {connection_id: 'local'}));
+			storage.local_queue = workerQueue(options);
+			const local_resource = {machine_id: options.id, type: 'node', name: options.name, capacity: request ? 0 : options.threads, cost: 0, time: 100, frameworks: options.frameworks.join(',')};
+			addResource(module, options, storage.resources, Object.assign({}, local_resource, {connection_id: 'local'}), true);
 			if (request) {
 				// run job and connect to send results, think how to combine with rtc which requires a longer connection process
 				// await processRequest(options, queue, request).then(result => require('./ws').wsConnectSend(websocket_url, options, request.user, request.request_id, result));
 			}
-			storage.ws = require('./add_module').addModule('ws', {options});
+			storage.ws = require('./add_module').addModule('ws', {apc: module, options, local: local_resource});
 		}],
-		['job', (request, resolve) => {
-			Promise.all(request.data.collection.map(batch => storage.local_queue({framework: request.data.framework, sources: request.data.sources, fixed_params: request.data.fixed_params, variable_params: batch}))).then(resolve);
+		['job', async (request, resolve) => {
+			processRequest(options, storage.local_queue, request.data, request.request_id, request.user)
+				.catch(e => console.log(`Failed to process request ${request.request_id}`, e))
+				.then(resolve);
 		}],
-		['ws', message => {
+		['send', data => {
+			storage.ws.emit('send', data);
+		}],
+		['message', message => {
 			switch(message.type) {
 				case 'resources':
-					return message.data.forEach(resource => addResource(storage.resources, resource));
+					return message.data.forEach(resource => addResource(module, options, storage.resources, resource));
 				case 'connected':
-					return addResource(storage.resources, message.data);
+					return addResource(module, options, storage.resources, message.data);
 				case 'disconnected':
 					delete storage.resources[message.connection_id];
 					break;

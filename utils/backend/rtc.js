@@ -30,35 +30,33 @@ const rtcSend = async (channel, request, rtc_message_limit = 100 * 1024) => { //
 		channel.send(JSON.stringify(request));
 };
 
-const handleChannelStatus = (rtc_elem, event, user) => { // Fix inconsistency of using "event" vs "e" in this file
+const handleChannelStatus = (rtc_module, channel, event, user) => { // Fix inconsistency of using "event" vs "e" in this file
 	if (event.type === 'open') {
-		rtc_elem.dispatchEvent(new CustomEvent('channelconnected', {detail: {channel: event.target}}));
+		rtc_module.emit('channelconnected', channel);
 	} else if (event.type === 'close') {
-		rtc_elem.dispatchEvent(new Event('channeldisconnected'));
+		rtc_module.emit('channeldisconnected');
 	}
 };
 
-const addDataChannel = (rtc_elem, event, user, receiving, _channel) => {
+const addDataChannel = (rtc_module, event, user, receiving, _channel) => {
 	const channel = _channel || event.channel;
-	channel.addEventListener('message', event => receiveMessage(rtc_elem, event, user, receiving));
-	channel.addEventListener('open', event => handleChannelStatus(rtc_elem, event, user));
-	channel.addEventListener('close', event => handleChannelStatus(rtc_elem, event, user));
+	channel.addEventListener('message', event => receiveMessage(rtc_module, channel, event, user, receiving));
+	channel.addEventListener('open', event => handleChannelStatus(rtc_module, channel, event, user));
+	channel.addEventListener('close', event => handleChannelStatus(rtc_module, channel, event, user));
 	return channel;
 };
 
-const receiveMessage = async (rtc_elem, event, user, receiving) => {
-	const message_data = parseJSON(event.data);
+const receiveMessage = async (rtc_module, channel, event, user, receiving) => {
+	const message_data = JSON.parse(event.data);
 	if (message_data.request_id && receiving.includes(message_data.request_id))
 		return;
-	const channel = event.target;
 	const message = await decodeMessage(channel, message_data, receiving);
-	rtc_elem.dispatchEvent(new CustomEvent('message', {detail: {message}}));
+	rtc_module.emit('message', message);
 };
 
 const sendCandidate = (resource, event, user) => {
-	if (event.candidate) {
-		resource.dispatchEvent(new CustomEvent('send', {detail: {type: 'rtc', data: {type: 'ice_candidate', user, data: event.candidate}}}));
-	}
+	if (event.candidate)
+		resource.emit('send', {type: 'rtc', data: {type: 'ice_candidate', user, data: event.candidate}});
 };
 
 const processIceQueue = async (connection, queue) => {
@@ -79,7 +77,7 @@ const handleConnectionState = async (connection, event, user) => {
 		connection.restartIce();
 };
 
-const createPeerConnection = (rtc_elem, resource, user, ice_queue, receiving, active = true) => {
+const createPeerConnection = (rtc_module, resource, user, ice_queue, receiving, active = true) => {
 	const google_stun = {
 		urls: [
 			'stun:stun.l.google.com:19302',
@@ -89,16 +87,16 @@ const createPeerConnection = (rtc_elem, resource, user, ice_queue, receiving, ac
 			'stun:stun4.l.google.com:19302'
 		]
 	};
-	const connection = new RTCPeerConnection({iceServers: [google_stun]});
+	const connection = new (require('wrtc')).RTCPeerConnection({iceServers: [google_stun]});
 	connection.addEventListener('icecandidate', event => sendCandidate(resource, event, user));
 	connection.addEventListener('icecandidateerror', event => console.log(event));
 	connection.addEventListener('signalingstatechange', event => handleSignalingState(connection, event, user));
 	connection.addEventListener('iceconnectionstatechange', event => handleConnectionState(connection, event, user));
 	connection.addEventListener('icegatheringstatechange', event => processIceQueue(connection, ice_queue));
 	if (active)
-		addDataChannel(rtc_elem, undefined, user, receiving, connection.createDataChannel(user));
+		addDataChannel(rtc_module, undefined, user, receiving, connection.createDataChannel(user));
 	else
-		connection.addEventListener('datachannel', event => addDataChannel(rtc_elem, event, user, receiving));
+		connection.addEventListener('datachannel', event => addDataChannel(rtc_module, event, user, receiving));
 	return connection;
 };
 
@@ -106,7 +104,7 @@ const processOffer = async (resource, user, connection, offer) => {
 	return connection.setRemoteDescription(offer)
 		.then(() => connection.createAnswer())
 		.then(answer => connection.setLocalDescription(answer))
-		.then(() => resource.dispatchEvent(new CustomEvent('send', {detail: {type: 'rtc', data: {type: 'answer', user, data: connection.localDescription}}})))
+		.then(() => resource.emit('send', {type: 'rtc', data: {type: 'answer', user, data: connection.localDescription}}))
 		.catch(e => console.log('Error processing offer: '+e));
 };
 
@@ -123,7 +121,7 @@ const processAnswer = (connection, answer) => {
 const sendOffer = (resource, user, connection) => {
 	connection.createOffer()
 		.then(offer => connection.setLocalDescription(offer))
-		.then(() => resource.dispatchEvent(new CustomEvent('send', {detail: {type: 'rtc', data: {type: 'offer', user, data: connection.localDescription}}})))
+		.then(() => resource.emit('send', {type: 'rtc', data: {type: 'offer', user, data: connection.localDescription}}))
 		.catch(e => console.log(e));
 };
 
@@ -143,28 +141,27 @@ const process = async (resource, user, connection, ice_queue, rtc_data) => {
 };
 
 // Missing: configuration for local STUN server
-export const rtc = (module, {connection_id: ws_connection_id, rtc_data}, elem, storage={ice_queue: [], receiving: []}) => ({
+const rtc = (module, {resource, connection_id: ws_connection_id, rtc_data}, storage={ice_queue: [], receiving: []}) => ({
 	hooks: [
 		['init', () => {
 
 		}],
-		['connect', (resource) => {
-			storage.peer_connection = createPeerConnection(elem, resource, ws_connection_id, storage.ice_queue, storage.receiving); // Find a way to have this not in storage
+		['connect', () => {
+			storage.peer_connection = createPeerConnection(module, resource, ws_connection_id, storage.ice_queue, storage.receiving); // Find a way to have this not in storage
 			sendOffer(resource, ws_connection_id, storage.peer_connection);
 		}],
 		['receivedata', data => {
-			const resource = e.target.closest('[data-module="resource"]');
 			if (!storage.peer_connection)
-				storage.peer_connection = createPeerConnection(elem, resource, ws_connection_id, storage.ice_queue, storage.receiving, false);
+				storage.peer_connection = createPeerConnection(module, resource, ws_connection_id, storage.ice_queue, storage.receiving, false);
 			process(resource, ws_connection_id, storage.peer_connection, storage.ice_queue, data);
 		}],
 		['channelconnected', (channel) => { // Update connection state
 			storage.channel = channel;
-			storage.status = 'connected';
+			module.dataset.status = 'connected';
 			// connected event for resource
 		}],
 		['channeldisconnected', e => {
-			storage.status = 'disconnected';
+			module.dataset.status = 'disconnected';
 		}],
 		['send', data => {
 			try {
@@ -174,7 +171,6 @@ export const rtc = (module, {connection_id: ws_connection_id, rtc_data}, elem, s
 			}
 		}],
 		['message', message => {
-			const resource = storage.resource;
 			resource.emit('message', message);
 		}],
 		['disconnect', () => {
@@ -182,3 +178,5 @@ export const rtc = (module, {connection_id: ws_connection_id, rtc_data}, elem, s
 		}]
 	]
 });
+
+module.exports = {rtc};

@@ -6,24 +6,24 @@ const resource = (module, {apc, resource, settings}, storage={}) => ({
 			storage.used = threads;
 		}],
 		['establishrtc', () => {
-			const connection_id = e.target.dataset.connection_id;
-			storage.rtc = require('./add_module').addModule('rtc', {connection_id});
-			storage.rtc.emit('connect', module);
+			const connection_id = module.dataset.connection_id;
+			storage.rtc = require('./add_module').addModule('rtc', {resource: module, connection_id});
+			storage.rtc.emit('connect');
 		}],
 		['processrtc', rtc_data => {
-			const connection_id = e.target.dataset.connection_id;
-			if (!storage.rtc && e.detail.type === 'offer')
-				storage.rtc = require('./add_module').addModule('rtc', {connection_id});
-			storage.rtc.emit('receivedata', rtc_data);
+			const connection_id = module.dataset.connection_id;
+			if (!storage.rtc && rtc_data.type === 'offer') {
+				storage.rtc = require('./add_module').addModule('rtc', {resource: module, connection_id});
+				storage.rtc.emit('receivedata', rtc_data);
+			} else if (storage.rtc)
+				storage.rtc.emit('receivedata', rtc_data);
 		}],
 		['send', data => {
-			if (e.target.dataset.connection_id === 'local')
+			if (module.dataset.connection_id === 'local')
 				return module.emit('message', data);
-			if (storage.rtc && storage.rtc.status === 'connected')
+			if (storage.rtc && storage.rtc.dataset.status === 'connected')
 				return storage.rtc.emit('send', data);
-			const ws = apc.storage.ws;
-			// Decide where to handle problems with data unsuitable to be sent via WebSocket (i.e. too big)
-			ws.emit('send', Object.assign(e.detail, {user: e.target.dataset.connection_id}));
+			apc.emit('send', Object.assign(data, {user: module.dataset.connection_id}));
 		}],
 		['message', message => {
 			switch(message.type) {

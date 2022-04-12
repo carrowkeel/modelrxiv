@@ -19,10 +19,10 @@ const prompt = (text) => {
 	});
 };
 
-const auth = () => new Promise(async (resolve, reject) => {
+const auth = (args) => new Promise(async (resolve, reject) => {
 	process.stdout.write('Modelrxiv.org login\n');
-	const user_name = await prompt('Nickname');
-	const user_password = await prompt('Password');
+	const user_name = args.nickname || await prompt('Nickname');
+	const user_password = args.password || await prompt('Password');
 	const request = require('https').request({
 		hostname: 'd.modelrxiv.org',
 		port: 443,
@@ -43,14 +43,14 @@ const auth = () => new Promise(async (resolve, reject) => {
 const initApc = async (websocket_url, credentials, id, threads=4, name='node', mode='subprocess', request_file='') => {
 	const frameworks = await frameworksFromDir('.');
 	const request = request_file !== '' ? await require('fs/promises').readFile(request_file).then(data => JSON.parse(data.toString())) : false;
-	const options = {public_url: 'https://modelrxiv.org', websocket_url, credentials: request?.credentials || credentials, id, threads, name, mode};
-	require('./add_module').addModule('ws', {options, request});
+	const options = {public_url: 'https://modelrxiv.org', websocket_url, credentials: request?.credentials || credentials, id, threads, name, mode, frameworks};
+	require('./add_module').addModule('apc', {options, request});
 };
 
 const main = async () => {
 	const args = process.argv.slice(2).reduce((a,v)=>Object.assign(a, {[v.split(/[= ]/)[0].replace('--','')]: v.split('=').slice(1).join('=')}), {});
 	try {
-		const credentials = args.request ? '' : (args.credentials || (await auth()));
+		const credentials = args.request ? '' : (args.credentials || (await auth(args)));
 		try {
 			initApc(args.url || 'wss://apc.modelrxiv.org', credentials, generateID(6), args.threads ? +(args.threads) : 4, args.name, args.mode, args.request);
 			//return require('./apc.js').init(args.url || 'wss://apc.modelrxiv.org', credentials, args.threads ? +(args.threads) : 4, generateID(6), args.name, args.mode, args.request);

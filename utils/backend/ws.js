@@ -41,23 +41,6 @@ const wsSend = async (ws, request, websocket_frame_limit = 30 * 1024, compressio
 		ws.sendUTF(JSON.stringify(Object.assign(request, {compression: compression_type, data: compressed})));
 };
 
-const processRequest = (options, queue, request, request_id, user) => new Promise(async (resolve, reject) => {
-	switch(options.mode) {
-		case 'slurm':
-			await require('fs/promises').writeFile(`${request_id}.request`, JSON.stringify(Object.assign(request, {credentials: options.credentials, request_id, user})));
-			require('child_process').exec(`sbatch --time=01:00:00 --mem=1G --ntasks=${options.machine.capacity} --wrap="node init.js --threads=${options.machine.capacity} --request=${request_id}.request;"`, err => {
-				if (err)
-					return reject();
-				return resolve();
-			});
-		case 'subprocess':
-		default:
-			return Promise.all(request.collection ? request.collection.map(batch => queue({framework: request.framework, sources: request.sources, fixed_params: request.fixed_params, variable_params: batch})) : [queue(request)]).then(result => {
-				return resolve(result);
-			});
-	}
-});
-
 const wsConnectSend = (websocket_url, options, user, request_id, result, attempt=0, retries=3) => new Promise((resolve, reject) => {
 	const params = new URLSearchParams({authorization: options.credentials.token, ...options.machine});
 	const WebSocketClient = require('websocket').client;
@@ -86,91 +69,64 @@ const wsConnectSend = (websocket_url, options, user, request_id, result, attempt
 	ws.connect(`${websocket_url}/?${params.toString()}`);
 });
 
-const connectWebSocket = (container, url, receiving = []) => {
-	const ws = new WebSocket(url);
-	ws.addEventListener('open', e => {
-		container.dispatchEvent(new Event('connected'));
-	});
-	ws.addEventListener('close', e => {
-		container.dispatchEvent(new Event('disconnected'));
-	});
-	ws.addEventListener('error', error => {
-		console.log(error);
-		container.dispatchEvent(new CustomEvent('error', {detail: {error}}));
-	});
-	ws.addEventListener('message', async e => {
-		const message_data = parseJSON(e.data);
-		if (message_data.request_id && receiving.includes(message_data.request_id))
-			return;
-		const message = await decodeMessage(ws, message_data, receiving);
-		container.dispatchEvent(new CustomEvent('message', {detail: {message}}));
-	});
-	return ws;
-};
-
-			try {
-				const result = await processRequest(options, queue, request.data, request.request_id, request.user);
-				return wsSend(connection, {type: 'result', request_id: request.request_id, user: request.user, machine_id: options.machine.id, data: result});
-			} catch (e) {
-				console.log(`Failed to process request ${request.request_id}`, e);
-			}
-
-const wsConnect = (module, websocket_url, options, receiving) => new Promise((resolve, reject) => {
+const wsConnect = (module, websocket_url, options, receiving=[]) => {
 	const WebSocketClient = require('websocket').client;
 	const ws = new WebSocketClient();
 	ws.on('connectFailed', e => {
 		console.log('WebSocket connection failed', e);
-		reject();
+		module.emit('disconnected');
 	});
 	ws.on('connect', connection => {
-		module.emit('connected', module);
+		module.emit('connected', connection);
 		connection.on('close', () => {
-			module.emit('disconnected', module);
+			module.emit('disconnected');
 		});
 		connection.on('error', e => {
 			console.log('WebSocket error', e);
-			module.emit('disconnected', module);
+			module.emit('disconnected');
 		});
 		connection.on('message', async message => {
 			const message_data = JSON.parse(message.utf8Data);
-			if (message_data.type !== 'request' || (message_data.request_id && receiving.includes(message_data.request_id)))
+			if (message_data.request_id && receiving.includes(message_data.request_id))
 				return;
 			const request = await decodeMessage(connection, message_data, receiving);
-			container.dispatchEvent(new CustomEvent('message', {detail: {message}}));
+			module.emit('message', request);
 		});
-		connection.sendUTF(JSON.stringify({type: 'connected', data: options.machine}));
-		resolve();
 	});
-	ws.connect(`${websocket_url}/?${params.toString()}`);
-});
+	ws.connect(websocket_url);
+};
 
-export const ws = (module, {options, local}, storage={receiving: [], status: 'disconnected'}) => ({
+const ws = (module, {apc, options, local}, storage={receiving: [], status: 'disconnected'}) => ({
 	hooks: [
 		['init', () => {
 			module.emit('connect');
 		}],
-		['connect', () => {
+		['connect', async () => {
 			if (storage.ws && storage.ws.readyState > 1)
 				return; // Possibly check if status is "connecting"
 			const params = new URLSearchParams({authorization: options.credentials.token, ...local});
 			storage.status = 'connecting';
-			storage.ws = wsConnect(module, `${options.url}/?${params.toString()}`);
+			wsConnect(module, `${options.websocket_url}/?${params.toString()}`);
 		}],
-		['connected', () => {
+		['connected', (connection) => {
 			storage.status = 'connected';
+			storage.ws = connection;
+			console.log('WebSocket connected');
 			module.emit('send', {type: 'connected', data: local});
 		}],
 		['disconnected', () => {
 			if (storage.status === 'connected') // Check why it disconnected
-				module.emit('connect', module);
+				module.emit('connect');
 			storage.status = 'disconnected';
 		}],
 		['send', data => {
 			return wsSend(storage.ws, data);
+			// From job
+			//return wsSend(connection, {type: 'result', request_id: request.request_id, user: request.user, machine_id: options.machine.id, data: result});
 		}],
-		['message', e => {
-			
-		}],
+		['message', message => {
+			apc.emit('message', message);
+		}]
 	]
 });
 
