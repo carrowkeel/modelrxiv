@@ -27,66 +27,6 @@ const draw = (container, data, offset=0, flush=false) => { // TODO: move preview
 	container.querySelectorAll(`[data-plot][data-name]`).forEach((plot,i) => data[0][plot.dataset.name] !== undefined ? plot.dispatchEvent(new CustomEvent('update', {detail: {data: data.map(step => step[plot.dataset.name]), offset, flush}})) : 0);
 };
 
-const pythonModuleWrapper = async (module, reload=false) => ({
-	module: await fetch(module.module_url, {cache: reload ? 'no-cache' : 'default'}).then(res => res.text()),
-	pyodide: await (async () => {
-		try {
-			if (typeof loadPyodide !== 'function')
-				await loadScript('/pyodide/pyodide.js');
-			const pyodide = await loadPyodide({indexURL: 'https://modelrxiv.org/pyodide/'});
-			await pyodide.loadPackage('numpy'); // Fix
-			if (module.modules) {
-				for (const module_name of module.modules.split(','))
-					await pyodide.loadPackage(module_name);
-			}
-			return pyodide;
-		} catch (e) {
-			return pyodide;
-			// Ignore "already loaded" error
-		}
-	})(),
-	step: function (params, _step, t) {
-		const code = `${this.module}
-out = step(params, _step, ${t})
-`;
-		this.pyodide.globals.set('params', this.pyodide.toPy(params));
-		this.pyodide.globals.set('_step', this.pyodide.toPy(_step));
-		this.pyodide.runPython(code);
-		const outputPr = this.pyodide.globals.get('out');
-		if (!outputPr)
-			return false;
-		const out = outputPr.toJs();
-		outputPr.destroy();
-		return out instanceof Map ? Object.fromEntries(out) : out;
-	}
-});
-
-const stepWrapper = (container, step_module, params, _step, storage=[]) => {
-	const t = storage.length;
-	const plots_container = container.querySelector('.plots');
-	const complete = (params, storage) => { // TODO: decide how result is handled in dynamics mode
-		const result = step_module.result ? step_module.result(params, storage) : {};
-		container.querySelector('.result-tab').innerHTML = '<h4>Result</h4><pre>'+Object.entries(result).map(([param, value]) => `${param}: ${value}\n`).join('')+'</pre>';
-		//container.querySelector('.result-tab').classList.add('show');
-		setTimeout(() => {
-			container.querySelector('.result-tab').classList.remove('show');
-		}, 5000);
-		draw(plots_container, storage, 0, true);
-		return false;
-	};
-	if (t - 1 === parseInt(params.target_steps)) {
-		complete(params, storage);
-		return false;
-	} else {
-		const step = step_module.step(params, _step, t);
-		if (!step)
-			return complete(params, storage);
-		storage.push(step);
-		draw(plots_container, storage, 0, true); // storage.slice(storage.length - 2), storage.length - 2);
-		return step;
-	}
-};
-
 const parsePresets = (presetText) => {
 	const cache = [];
 	const presets = [];
@@ -204,6 +144,28 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			}
 		}],
 		['[data-module="model"]', 'run', async e => {
+			if (!storage.loop || e.detail?.reset) {
+				e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false}}));
+				const stats = []; // Rename
+				if (storage.timeout)
+					clearTimeout(storage.timeout);
+				storage.loop = async (_step) => {
+					if (!document.body.contains(elem))
+						return;
+					if (e.target.dataset.state === 'paused')
+						await new Promise(resolve => e.target.addEventListener('run', resolve, {once: true}));
+					const step = stepWrapper(elem, storage.step_module, storage.params, _step, stats);
+					if (!step)
+						return e.target.dispatchEvent(new Event('stopped'));
+					storage.timeout = setTimeout(storage.loop, 10, step);
+				};
+			}
+			if (e.target.dataset.state !== 'paused')
+				storage.loop();
+			e.target.dataset.state = 'running';
+			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'P');
+		}],
+		['[data-module="model"]', 'run_browser', async e => {
 			if (storage.step_module === undefined || e.detail?.reload) {
 				storage.step_module = entry.framework === 'js' ? await import(`${entry.module_url}${e.detail?.reload ? `?${new Date().getTime()}` : ''}`) : (entry.framework === 'py' ? await pythonModuleWrapper(entry, e.detail?.reload) : false);
 			}
