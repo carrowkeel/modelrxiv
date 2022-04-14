@@ -7,7 +7,7 @@ run_dynamics <- function(script, params) {
 	step <- NULL
 	for(t in 0:steps) {
 		step <- step_module$step(params, step, t)
-		write(paste(toJSON(step, auto_unbox=TRUE)), stderr())
+		write(paste(toJSON(list(type='dynamics', data=step), auto_unbox=TRUE)), stdout())
 	}
 	return(step)
 }
@@ -57,9 +57,7 @@ main <- function() {
 		if(message$type != 'job') {
 			continue
 		}
-		output <- {}
-		output$type <- 'result'
-		output$result <- process_job(message$request)
+		output <- list(type='result', data=process_job(message$request))
 		write(paste(toJSON(output, auto_unbox=TRUE)), stdout())
 	}
 }
