@@ -9,68 +9,6 @@ const signedURL = (url, signature, query = {}) => {
 	return `${url}?${qs.toString()}`;
 };
 
-/*
-const pythonModuleWrapper = async (module, reload=false) => ({
-	module: await fetch(module.module_url, {cache: reload ? 'no-cache' : 'default'}).then(res => res.text()),
-	pyodide: await (async () => {
-		try {
-			if (typeof loadPyodide !== 'function')
-				await loadScript('/pyodide/pyodide.js');
-			const pyodide = await loadPyodide({indexURL: 'https://modelrxiv.org/pyodide/'});
-			await pyodide.loadPackage('numpy'); // Fix
-			if (module.modules) {
-				for (const module_name of module.modules.split(','))
-					await pyodide.loadPackage(module_name);
-			}
-			return pyodide;
-		} catch (e) {
-			return pyodide;
-			// Ignore "already loaded" error
-		}
-	})(),
-	step: function (params, _step, t) {
-		const code = `${this.module}
-out = step(params, _step, ${t})
-`;
-		this.pyodide.globals.set('params', this.pyodide.toPy(params));
-		this.pyodide.globals.set('_step', this.pyodide.toPy(_step));
-		this.pyodide.runPython(code);
-		const outputPr = this.pyodide.globals.get('out');
-		if (!outputPr)
-			return false;
-		const out = outputPr.toJs();
-		outputPr.destroy();
-		return out instanceof Map ? Object.fromEntries(out) : out;
-	}
-});
-
-const stepWrapper = (container, step_module, params, _step, storage=[]) => {
-	const t = storage.length;
-	const plots_container = container.querySelector('.plots');
-	const complete = (params, storage) => { // TODO: decide how result is handled in dynamics mode
-		const result = step_module.result ? step_module.result(params, storage) : {};
-		container.querySelector('.result-tab').innerHTML = '<h4>Result</h4><pre>'+Object.entries(result).map(([param, value]) => `${param}: ${value}\n`).join('')+'</pre>';
-		//container.querySelector('.result-tab').classList.add('show');
-		setTimeout(() => {
-			container.querySelector('.result-tab').classList.remove('show');
-		}, 5000);
-		draw(plots_container, storage, 0, true);
-		return false;
-	};
-	if (t - 1 === parseInt(params.target_steps)) {
-		complete(params, storage);
-		return false;
-	} else {
-		const step = step_module.step(params, _step, t);
-		if (!step)
-			return complete(params, storage);
-		storage.push(step);
-		draw(plots_container, storage, 0, true); // storage.slice(storage.length - 2), storage.length - 2);
-		return step;
-	}
-};
-*/
-
 const pythonModuleWrapper = async (module_url, reload=false) => ({
 	module: await fetch(module_url, {cache: reload ? 'no-cache' : 'default'}).then(res => res.text()),
 	pyodide: await (async () => {
