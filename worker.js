@@ -133,10 +133,10 @@ const scriptFromSources = (sources, credentials) => {
 	return script_url;
 };
 
-function* dynamicsStream (script, framework, params) {
+async function* dynamicsStream (script, framework, params) {
 	const step_module = await scriptWrapper(script, framework);
 	const steps = Math.max(1, params.target_steps || 0);
-	let step = null;
+	let step = undefined;
 	for (const t of range(0, steps)) {
 		step = step_module.step(params, step, t);
 		if (step === false)
@@ -170,15 +170,15 @@ self.addEventListener("message", async e => {
 		case request.fixed_params.test:
 			return test(script, request.framework).then(result => self.postMessage({type: 'result', data: result}));
 		case request.variable_params === undefined:
-			const dynamics_stream = dynamicsStream(script, request.framework, request.fixed_params);
+			const dynamics_stream = await dynamicsStream(script, request.framework, request.fixed_params);
 			while(true) {
-				const step = dynamics_stream.next();
+				const step = await dynamics_stream.next();
 				if (step.done)
 					break;
-				self.postMessage({type: 'dynamics', data: step});
+				self.postMessage({type: 'dynamics', data: step.value});
 			}
 			return self.postMessage({type: 'result', data: {}}); // Deriving a result here depends on step_module.result
 		default:
-			return runParams(script, request.framework, request.fixed_params, request.variable_params).then(result => self.postMessage({type: 'result', data: result));
+			return runParams(script, request.framework, request.fixed_params, request.variable_params).then(result => self.postMessage({type: 'result', data: result}));
 	}
 });

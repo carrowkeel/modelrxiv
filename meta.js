@@ -15,18 +15,6 @@ const grouped = results => {
 	}, {});
 };
 
-const dataPoint2 = (param_ranges, result, _x, _y, step) => {
-	const color = result.color || [0, 0, 0];
-	const opacity = result.color ? 1 : result.value || result;
-	const [x, y, w, h] = [
-		Math.min(Math.max(_x, param_ranges.x.range[0]), param_ranges.x.range[1]),
-		Math.min(Math.max(_y, param_ranges.y.range[0]), param_ranges.y.range[1]),
-		step[0],
-		step[1]
-	];
-	return [x, y, w, h, color, opacity, {'data-x': _x, 'data-y': _y, 'data-result': result.value}];
-};
-
 const dataPoint = (output, param_ranges, result, _x, _y, step) => {
 	// result.scores ? {color: mixer(...Object.values(result.scores).sort((a,b)=>b.prop-a.prop).slice(0, 2).reduce((a,v,i,arr)=>a.concat([v.color, v.prop/sum(arr.map(v=>v.prop))]), []))} : result;
 	const color = output?.values ? output.values[result].color.split(',') : [0, 0, 0];
@@ -79,35 +67,6 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 	}, {});
 	const stat = user_params.stat || entry.result_params[0].name; // TODO: Defaults to first stat
 	switch(ranges) {
-		case 'files': {
-			const params_set = [];
-			const grouped = [];
-			for (const x of axes.x) {
-				const params = Object.assign({}, user_params, {[param_ranges.x.name]: x});
-				if (job_options.files) {
-					grouped.push(job_options.files.split(';').map(file => {
-						params_set.push(Object.assign({}, job_options, {file}));
-						return params_set.length - 1;
-					}));
-				} else {
-					params_set.push(job_options);
-					grouped.push([params_set.length - 1]);
-				}
-			}
-			const combine = (results) => { // TODO: defined by flag in details object
-				return {score: mean(results.map(result => result.score))};
-			};
-			const results = await dist(params_set);
-			const values = grouped.map(group => {
-				if (group.length === 1)
-					return results[group[0]];
-				else
-					return combine(results.slice(group[0], group[group.length-1]));
-			});
-			const lines = [{line: values.map((value,i) => [param_ranges.x.type === 'select' ? i : axes.x[i], value.score]), color: [31,119,180]}];
-			container.querySelector(`[data-name="${plot_name}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: lines}}));
-			break;
-		}
 		case 1: {
 			dist(user_params, axes.x.map(x => {
 				return {[param_ranges.x.name]: x};
