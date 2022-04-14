@@ -137,7 +137,7 @@ async function* dynamicsStream (script, framework, params) {
 	const step_module = await scriptWrapper(script, framework);
 	const steps = Math.max(1, params.target_steps || 0);
 	let step = undefined;
-	for (const t of range(0, steps)) {
+	for (const t of range(0, steps + 1)) {
 		step = step_module.step(params, step, t);
 		if (step === false)
 			break;
