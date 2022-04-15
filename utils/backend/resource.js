@@ -32,12 +32,7 @@ const resource = (module, {apc, resource, settings}, storage={}) => ({
 				case 'request': {
 					return new Promise((resolve, reject) => {
 						apc.emit('job', message, resolve);
-					}).then(result => {
-						if (result instanceof ReadableStream)
-							console.log(result.getReader());
-						else
-							module.emit('send', {type: 'result', request_id: message.request_id, data: result})
-					});
+					}).then(result => module.emit('send', {type: 'result', request_id: message.request_id, data: result}));
 				}
 			}
 		}]

@@ -31,6 +31,8 @@ const decodeMessage = async (ws, message_data, receiving) => {
 };
 
 const wsSend = async (ws, request, websocket_frame_limit = 30 * 1024, compression_threshold = 10 * 1024) => {
+	if (request.data.constructor.name === 'Readable') // For the moment, do not transmit stream data via websocket (an alternative is to turn the stream into chunks)
+		throw 'Attempting to transmit stream via WebSocket';
 	const compression_type = JSON.stringify(request.data).length > compression_threshold ? 'gzip' : 'none';
 	const compressed = compression_type === 'gzip' ? compress(request.data) : request.data;
 	if (compressed.length > websocket_frame_limit) {

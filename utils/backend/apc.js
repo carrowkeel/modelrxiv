@@ -41,7 +41,7 @@ const loadSources = (file_cache, public_url, sources, credentials) => {
 	return file_cache[script.id];
 };
 
-const spawnWorker = (options, file_cache, workers, i, request) => new Promise(async resolve => {
+const spawnWorker = (options, file_cache, workers, i, request, stream) => new Promise(async resolve => {
 	const exec = {'js': 'node worker.js', 'py': 'python3 worker.py', 'R': 'Rscript worker.R'};
 	const cache = [];
 	if (workers[i] === undefined) {
@@ -55,19 +55,26 @@ const spawnWorker = (options, file_cache, workers, i, request) => new Promise(as
 		const parts = cache.join('').split('\n');
 		if (parts.length === 1)
 			return;
-		const message = JSON.parse(parts[0]);
+		const messages = parts.slice(0, parts.length - 1).map(JSON.parse);
 		cache.length = 0;
-		cache.push(parts[1]);
-		if (message.type === 'result') {
-			resolve(message.result);
+		cache.push(parts[parts.length - 1]);
+		for (const message of messages) {
+			switch(message.type) {
+				case 'dynamics':
+					stream(message.data);
+					break;
+				default:
+					stream(null);
+					resolve(message.data);
+			}
 		}
 	});
 	const script = await loadSources(file_cache, options.public_url, request.sources, options.credentials);
 	workers[i].stdin.write(JSON.stringify({type: 'job', request: Object.assign({}, request, {script: script.filename})})+'\n');
 });
 
-const workerQueue = (options, workers=Array.from(new Array(options.threads)), queue=[], file_cache={}) => (data) => {
-	const deploy = (workers, thread) => spawnWorker(options, file_cache, workers, thread, data).then(result => {
+const workerQueue = (options, workers=Array.from(new Array(options.threads)), queue=[], file_cache={}) => (request, stream) => {
+	const deploy = (workers, thread) => spawnWorker(options, file_cache, workers, thread, request, stream).then(result => {
 		if (queue.length > 0) {
 			const {r, d} = queue.shift();
 			r(d(workers, thread));
@@ -97,9 +104,17 @@ const processRequest = (options, queue, request, request_id, user) => new Promis
 			});
 		case 'subprocess':
 		default:
-			return Promise.all(request.collection ? request.collection.map(batch => queue({framework: request.framework, sources: request.sources, fixed_params: request.fixed_params, variable_params: batch})) : [queue(request)]).then(result => {
-				return resolve(result);
-			});
+			switch(true) {
+				case request.collection !== undefined:
+					return Promise.all(request.collection.map(batch => {
+						return queue({framework: request.framework, sources: request.sources, fixed_params: request.fixed_params, variable_params: batch});
+					})).then(resolve);
+				default:
+					const {Readable} = require('stream');
+					const dynamics_stream = new Readable({objectMode: true, read(chunk){}});
+					queue(request, (data) => dynamics_stream.push(data)); // Would be better if this was async so that we can wait to push, either way to avoid data accumulating we would need to pause the process on the worker
+					resolve(dynamics_stream);
+			}
 	}
 });
 
@@ -118,7 +133,7 @@ const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
 			const local_resource = {machine_id: options.id, type: 'node', name: options.name, capacity: request ? 0 : options.threads, cost: 0, time: 100, frameworks: options.frameworks.join(',')};
 			addResource(module, options, storage.resources, Object.assign({}, local_resource, {connection_id: 'local'}), true);
 			if (request) {
-				// run job and connect to send results, think how to combine with rtc which requires a longer connection process
+				// For slurm mode, run job and connect to send results, think how to combine with rtc which requires a longer connection process
 				// await processRequest(options, queue, request).then(result => require('./ws').wsConnectSend(websocket_url, options, request.user, request.request_id, result));
 			}
 			storage.ws = require('./add_module').addModule('ws', {apc: module, options, local: local_resource});

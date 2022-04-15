@@ -164,11 +164,21 @@ const rtc = (module, {resource, connection_id: ws_connection_id, rtc_data}, stor
 			module.dataset.status = 'disconnected';
 		}],
 		['send', data => {
-			try {
-				rtcSend(storage.channel, data);
-			} catch (e) {
-				console.log(e);
-			}
+			// Move stream handling elsewhere
+			const request = data; // Is this always request?
+			if (request.data.constructor.name === 'Readable') {
+				const stream = request.data;
+				stream.on('readable', () => {
+					while(true) {
+						const value = stream.read();
+						if (value === null)
+							break;
+						rtcSend(storage.channel, Object.assign({}, request, {data: value}));
+					}
+				});
+				stream.on('close', () => rtcSend(storage.channel, Object.assign({}, request, {data: {stream_closed: true}})));
+			} else
+				rtcSend(storage.channel, request);
 		}],
 		['message', message => {
 			resource.emit('message', message);

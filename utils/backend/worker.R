@@ -57,16 +57,10 @@ main <- function() {
 		if(message$type != 'job') {
 			continue
 		}
-		output <- list(type='result', data=process_job(message$request))
+		result <- process_job(message$request)
+		output <- list(type='result', data=result)
 		write(paste(toJSON(output, auto_unbox=TRUE)), stdout())
 	}
 }
 
 main()
-
-##dynamics_test <- function() {
-##	params <- list(n=10, P=0.5, L=1.01, N=100, target_steps=100)
-##	return(run_dynamics('test.R', params))
-##}
-
-##dynamics_test()
