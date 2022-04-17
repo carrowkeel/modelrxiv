@@ -41,7 +41,7 @@ const loadSources = (file_cache, public_url, sources, credentials) => {
 	return file_cache[script.id];
 };
 
-const spawnWorker = (options, file_cache, workers, i, request, stream) => new Promise(async resolve => {
+const spawnWorker = (apc, options, file_cache, workers, i, request, stream) => new Promise(async resolve => {
 	const exec = {'js': 'node worker.js', 'py': 'python3 worker.py', 'R': 'Rscript worker.R'};
 	const cache = [];
 	if (workers[i] === undefined) {
