@@ -5,7 +5,6 @@
 const range = (start,end) => Array.from(Array(end-start)).map((v,i)=>i+start);
 
 async function* dynamicsStream (script, params) {
-	const step_module = await import(`./${script}`);
 	const steps = Math.max(1, params.target_steps || 0);
 	let step = undefined;
 	for (const t of range(0, steps + 1)) {
@@ -16,17 +15,15 @@ async function* dynamicsStream (script, params) {
 	}
 }
 
-const runParams = async (script, fixed_params, variable_params) => {
-	const step_module = await import(`./${script}`);
+const runParams = async (script, fixed_params, variable_params=[{}], step=()=>{}) => {
 	return variable_params.map(variable_params => {
 		const params = Object.assign({}, fixed_params, variable_params);
-		return step_module.run(params);
+		return step_module.run(params, step);
 	});
 };
 
 const test = async (script) => {
 	try {
-		const step_module = await import(`./${script}`);
 		const params = Object.assign({}, step_module.defaults());
 		return {input_params: params, dynamics_params: step_module.step ? step_module.step(step_module.defaults(), undefined, 0) : {}, result_params: step_module.run(step_module.defaults())};
 	} catch (e) {
@@ -35,11 +32,12 @@ const test = async (script) => {
 };
 
 const processJob = async (request) => {
+	const step_module = await import(`./${request.script}`);
 	switch(true) {
 		case request.fixed_params.test:
-			return test(request.script);
-		case request.variable_params === undefined:
-			const dynamics_stream = await dynamicsStream(request.script, request.fixed_params);
+			return test(step_module);
+		case request.variable_params === undefined && step_module.step:
+			const dynamics_stream = await dynamicsStream(step_module, request.fixed_params);
 			while(true) {
 				const step = await dynamics_stream.next();
 				if (step.done)
@@ -47,8 +45,11 @@ const processJob = async (request) => {
 				process.stdout.write(JSON.stringify({type: 'dynamics', data: step.value})+'\n');
 			}
 			return {};
+		case request.variable_params === undefined:
+			const step_output = (step) => process.stdout.write(JSON.stringify({type: 'dynamics', data: step})+'\n');
+			return runParams(step_module, request.fixed_params, undefined, step_output);
 		default:
-			return runParams(request.script, request.fixed_params, request.variable_params);
+			return runParams(step_module, request.fixed_params, request.variable_params);
 	}
 };
 
