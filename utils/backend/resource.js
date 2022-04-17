@@ -29,6 +29,8 @@ const resource = (module, {apc, resource, settings}, storage={}) => ({
 			switch(message.type) {
 				case 'rtc':
 					return module.emit('processrtc', message.data);
+				case 'terminate':
+					return apc.emit('message', message); // Example implementation of termination signal
 				case 'request': {
 					return new Promise((resolve, reject) => {
 						apc.emit('job', message, resolve);

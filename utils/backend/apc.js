@@ -69,12 +69,17 @@ const spawnWorker = (options, file_cache, workers, i, request, stream) => new Pr
 			}
 		}
 	});
+	apc.on('message', message => { // Example implementation of termination signal
+		if (message.type !== 'terminate' || message.request_id !== request.request_id)
+			return;
+		workers[i].kill();
+	});
 	const script = await loadSources(file_cache, options.public_url, request.sources, options.credentials);
 	workers[i].stdin.write(JSON.stringify({type: 'job', request: Object.assign({}, request, {script: script.filename})})+'\n');
 });
 
-const workerQueue = (options, workers=Array.from(new Array(options.threads)), queue=[], file_cache={}) => (request, stream) => {
-	const deploy = (workers, thread) => spawnWorker(options, file_cache, workers, thread, request, stream).then(result => {
+const workerQueue = (apc, options, workers=Array.from(new Array(options.threads)), queue=[], file_cache={}) => (request, stream) => {
+	const deploy = (workers, thread) => spawnWorker(apc, options, file_cache, workers, thread, request, stream).then(result => {
 		if (queue.length > 0) {
 			const {r, d} = queue.shift();
 			r(d(workers, thread));
@@ -129,7 +134,7 @@ const addResource = (apc, options, resources, resource, initial=false) => {
 const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
 	hooks: [
 		['init', () => {
-			storage.local_queue = workerQueue(options);
+			storage.local_queue = workerQueue(module, options);
 			const local_resource = {machine_id: options.id, type: 'node', name: options.name, capacity: request ? 0 : options.threads, cost: 0, time: 100, frameworks: options.frameworks.join(',')};
 			addResource(module, options, storage.resources, Object.assign({}, local_resource, {connection_id: 'local'}), true);
 			if (request) {
