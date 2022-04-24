@@ -2,15 +2,16 @@
 const resource = (module, {apc, resource, settings}, storage={}) => ({
 	hooks: [
 		['init', () => { // May not be necessary
-			const threads = settings ? settings.used : (resource.cost > 0 ? 0 : resource.capacity);
+			const threads = settings ? settings.used : resource.capacity;
 			storage.used = threads;
 		}],
-		['connected', () => {
-			// Change status to connected
+		['wsconnected', (connection_id) => {
+			if (connection_id)
+				module.dataset.connection_id = connection_id;
+			module.dataset.connectionStatus |= 1;
 		}],
-		['disconnected', () => {
-			// Check rtc status
-			// Change status to disconnected
+		['wsdisconnected', () => {
+			module.dataset.connectionStatus &= ~1;
 		}],
 		['establishrtc', () => {
 			const connection_id = module.dataset.connection_id;

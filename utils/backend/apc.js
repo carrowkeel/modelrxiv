@@ -18,7 +18,7 @@ const signedURL = (url, signature, query = {}) => {
 
 const scriptFromSources = (sources, credentials, public_url) => { // Will support multiple sources, but currently only using the first as the script file
 	const script_source = sources[0];
-	const filename = `${['script', credentials.user_id, script_source.model_id].join('_')}.${script_source.framework === 'js' ? 'mjs' : (script_source.framework === 'node_js' ? 'js' : script_source.framework)}`;
+	const filename = `${['script', credentials.user_id, script_source.model_id].join('_')}.${script_source.framework === 'js' ? 'mjs' : script_source.framework}`;
 	const url = public_url + (script_source.private ? signedURL(`/users/${credentials.user_id}/${script_source.model_id}.${script_source.framework}`, credentials.cdn) : `/models/${script_source.model_id}.${script_source.framework}`);
 	return {id: script_source.model_id, url, filename, framework: script_source.framework};
 };
@@ -52,7 +52,7 @@ const loadSources = (file_cache, public_url, sources, credentials) => {
 };
 
 const spawnWorker = (apc, options, file_cache, workers, i, request, stream) => new Promise(async resolve => {
-	const exec = {'js': 'node worker.js', 'py': 'python3 worker.py', 'R': 'Rscript worker.R'};
+	const exec = {'js': 'node worker.js', 'node.js': 'node worker.node.js', 'py': 'python3 worker.py', 'R': 'Rscript worker.R'}; // This is inconsistent, supposedly the frameworks are read from the directory but here they are hard-coded
 	const cache = [];
 	if (workers[i] === undefined) {
 		workers[i] = require('child_process').exec(exec[request.framework], {maxBuffer: 10 * 1024 * 1024});
@@ -126,7 +126,7 @@ const processRequest = (options, queue, request, request_id, user) => new Promis
 						chunks.push(data.toString());
 					});
 					output_stream.on('close', () => {
-						// Delete pipe file
+						// TODO: Delete pipe file
 						resolve(JSON.parse(chunks.join('')));
 					});
 				});
@@ -151,7 +151,7 @@ const addResource = (apc, options, resources, resource, initial=false) => {
 		return;
 	const current = Object.keys(resources).filter(connection_id => resources[connection_id].dataset.machine_id === resource.machine_id);
 	if (current.length > 0)
-		return current.forEach(connection_id => resources[connection_id].emit('connected'));
+		return current.forEach(connection_id => resources[connection_id].emit('wsconnected', resource.connection_id));
 	resources[resource.connection_id] = require('./add_module').addModule('resource', {apc, resource, frameworks: resource.frameworks, machine_id: resource.machine_id, connection_id: resource.connection_id});
 	return resources[resource.connection_id];
 };
@@ -185,7 +185,7 @@ const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
 				case 'connected':
 					return addResource(module, options, storage.resources, message.data);
 				case 'disconnected':
-					return storage.resources[message.connection_id].emit('disconnected');
+					return storage.resources[message.connection_id].emit('wsdisconnected');
 				default:
 					return storage.resources[message.user].emit('message', message);
 			}
