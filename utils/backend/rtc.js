@@ -146,9 +146,10 @@ const rtc = (module, {resource, connection_id: ws_connection_id, rtc_data}, stor
 		['init', () => {
 
 		}],
-		['connect', () => {
+		['connect', (resolve) => {
 			storage.peer_connection = createPeerConnection(module, resource, ws_connection_id, storage.ice_queue, storage.receiving); // Find a way to have this not in storage
 			sendOffer(resource, ws_connection_id, storage.peer_connection);
+			module.once('channelconnected', resolve);
 		}],
 		['receivedata', data => {
 			if (!storage.peer_connection)

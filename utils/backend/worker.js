@@ -4,7 +4,7 @@
 
 const range = (start,end) => Array.from(Array(end-start)).map((v,i)=>i+start);
 
-async function* dynamicsStream (script, params) {
+async function* dynamicsStream (step_module, params) {
 	const steps = Math.max(1, params.target_steps || 0);
 	let step = undefined;
 	for (const t of range(0, steps + 1)) {
@@ -15,14 +15,17 @@ async function* dynamicsStream (script, params) {
 	}
 }
 
-const runParams = async (script, fixed_params, variable_params=[{}], step=()=>{}) => {
-	return variable_params.map(variable_params => {
-		const params = Object.assign({}, fixed_params, variable_params);
-		return step_module.run(params, step);
-	});
+const runParams = async (step_module, fixed_params, variable_params, step_output=()=>{}) => {
+	return variable_params ?
+		variable_params.map(variable_params => {
+			const params = Object.assign({}, fixed_params, variable_params);
+			return step_module.run(params, step_output);
+		})
+	:
+		step_module.run(fixed_params, step_output);
 };
 
-const test = async (script) => {
+const test = async (step_module) => {
 	try {
 		const params = Object.assign({}, step_module.defaults());
 		return {input_params: params, dynamics_params: step_module.step ? step_module.step(step_module.defaults(), undefined, 0) : {}, result_params: step_module.run(step_module.defaults())};

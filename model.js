@@ -108,40 +108,6 @@ const parsePresets = (presetText) => {
 	return presets;
 };
 
-
-// TODO: move to plot module
-const groupPlots = (container) => {
-	const plots = Array.from(container.querySelectorAll('.plot:first-child:last-child [data-plot]')).map(plot => Object.assign({elem: plot.closest('.plot')}, plot.dataset, {labels: JSON.parse(plot.dataset.labels)}));
-	const grouped = plots.reduce((groups, plot) => {
-		const key = [plot.labels.x, plot.labels.y, plot.xbounds, plot.ybounds].join(',');
-		return Object.assign(groups, {[key]: groups[key] ? groups[key].concat(plot.elem) : [plot.elem]});
-	}, {});
-	for (const group of Object.values(grouped)) {
-		if (group.length < 2)
-			continue;
-		const target_group = group[0].closest('.group');
-		for (const plot of group.slice(1)) {
-			const source_group = plot.closest('.group');
-			target_group.appendChild(plot);
-			source_group.remove();
-		}
-		group.forEach(plot => plot.dispatchEvent(new Event('update')));
-	}
-};
-
-const plotsFromOutput = (model) => { // Should take model.dynamics_params not model
-	return model.dynamics_params.map(output => {
-		return {
-			name: output.name,
-			draw: output.type === 'grid' ? 'canvas' : 'svg',
-			type: output.type === 'grid' ? 'hist_2d' : (output.type === 'vector' ? 'scatter_rt' : (output.type === 'repeats' ? 'lines' : 'line_plot')), // TODO: function for mapping types to plots
-			xbounds: output.type === 'vector' || output.type === 'grid' ? (output.range ? output.range.split(',').map(v => !isNaN(v) ? +(v) : v) : [0, 1]) : [0, 'target_steps'],
-			ybounds: output.range ? output.range.split(',').map(v => !isNaN(v) ? +(v) : v) : [0, 1],
-			labels: {title: output.label, x: model.time || 'Steps', y: output.units || output.label}
-		};
-	});
-};
-
 const runGrid = (entry, form, defaults, plots_elem, title) => {
 	const params = numericize(readForm(form, defaults));
 	const selected = Array.from(form.querySelectorAll('.option.selected'));
@@ -189,6 +155,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 					Prism.highlightElement(elem.querySelector('.editor code'));
 					break;
 				case elem.querySelector('.plots') !== null:
+					const {plotsFromOutput, groupPlots} = await import('./plot.js');
 					const plots_container = elem.querySelector('.plots');
 					storage.params = numericize(readForm(elem.querySelector('.parameters-menu .form'), defaultsFromInput(entry.input_params)));
 					await Promise.all(plotsFromOutput(entry).map(plot => {
@@ -203,12 +170,14 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 					if (e.detail?.group)
 						groupPlots(plots_container);
 			}
+			if (e.detail?.resolve)
+				e.detail.resolve();
 		}],
 		['[data-module="model"]', 'run', async e => {
 			const plots_container = elem.querySelector('.plots');
 			const step_interval = 10;
 			if (!storage.loop || e.detail?.reset) {
-				e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false}}));
+				await new Promise(resolve => e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false, resolve}})));
 				const request = {framework: entry.framework, sources: [{type: 'script', private: entry.private, model_id: entry.model_id, framework: entry.framework}], params: storage.params};
 				const stream = await new Promise(resolve => document.querySelector('.apocentric').dispatchEvent(new CustomEvent('dynamics', {detail: {request, resolve}}))).then(stream => stream.getReader());
 				const step_storage = [];
@@ -223,6 +192,8 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 					if (step.done)
 						return e.target.dispatchEvent(new Event('stopped'));
 					step_storage.push(step.value);
+					if (step_storage.length > 100)
+						step_storage.shift();
 					draw(plots_container, step_storage, 0, true);
 					storage.timeout = setTimeout(storage.loop, step_interval);
 				};

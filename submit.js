@@ -311,7 +311,6 @@ const hooks = (env, entry, query, elem) => [
 
 export const submit = (env, {entry, query}, elem, storage={}) => ({
 	render: async () => {
-		const frameworks = {js: 'JavaScript', py: 'Python 3', R: 'R'};
 		elem.innerHTML = await fetch('/pages/submit').then(res => res.text());
 		elem.dispatchEvent(new Event('init'));
 		elem.dispatchEvent(new Event('done'));

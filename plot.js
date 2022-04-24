@@ -39,6 +39,38 @@ const shorten = (n) => {
 };
 const inbounds = (point, bounds) => point[0] >= bounds[0][0] && point[0] <= bounds[0][1] && point[1] >= bounds[1][0] && point[1] <= bounds[1][1];
 
+export const groupPlots = (container) => {
+	const plots = Array.from(container.querySelectorAll('.plot:first-child:last-child [data-plot]')).map(plot => Object.assign({elem: plot.closest('.plot')}, plot.dataset, {labels: JSON.parse(plot.dataset.labels)}));
+	const grouped = plots.reduce((groups, plot) => {
+		const key = [plot.labels.x, plot.labels.y, plot.xbounds, plot.ybounds].join(',');
+		return Object.assign(groups, {[key]: groups[key] ? groups[key].concat(plot.elem) : [plot.elem]});
+	}, {});
+	for (const group of Object.values(grouped)) {
+		if (group.length < 2)
+			continue;
+		const target_group = group[0].closest('.group');
+		for (const plot of group.slice(1)) {
+			const source_group = plot.closest('.group');
+			target_group.appendChild(plot);
+			source_group.remove();
+		}
+		group.forEach(plot => plot.dispatchEvent(new Event('update')));
+	}
+};
+
+export const plotsFromOutput = (model) => { // Should take model.dynamics_params not model
+	return model.dynamics_params.map(output => {
+		return {
+			name: output.name,
+			draw: output.type === 'grid' ? 'canvas' : 'svg',
+			type: output.type === 'grid' ? 'hist_2d' : (output.type === 'vector' ? 'scatter_rt' : (output.type === 'repeats' ? 'lines' : 'line_plot')), // TODO: function for mapping types to plots
+			xbounds: output.type === 'vector' || output.type === 'grid' ? (output.range ? output.range.split(',').map(v => !isNaN(v) ? +(v) : v) : [0, 1]) : [0, 'target_steps'],
+			ybounds: output.range ? output.range.split(',').map(v => !isNaN(v) ? +(v) : v) : [0, 1],
+			labels: {title: output.label, x: model.time || 'Steps', y: output.units || output.label}
+		};
+	});
+};
+
 const createSVG = (container, bounds = [[0, 1], [0, 1]], ratio=1) => {
 	const w = Math.floor(container.getBoundingClientRect().width) - 1;
 	const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

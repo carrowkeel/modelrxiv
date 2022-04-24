@@ -5,6 +5,13 @@ const resource = (module, {apc, resource, settings}, storage={}) => ({
 			const threads = settings ? settings.used : (resource.cost > 0 ? 0 : resource.capacity);
 			storage.used = threads;
 		}],
+		['connected', () => {
+			// Change status to connected
+		}],
+		['disconnected', () => {
+			// Check rtc status
+			// Change status to disconnected
+		}],
 		['establishrtc', () => {
 			const connection_id = module.dataset.connection_id;
 			storage.rtc = require('./add_module').addModule('rtc', {resource: module, connection_id});

@@ -48,11 +48,11 @@ const initApc = async (websocket_url, credentials, id, threads=4, name='node', m
 };
 
 const main = async () => {
-	const args = process.argv.slice(2).reduce((a,v)=>Object.assign(a, {[v.split(/[= ]/)[0].replace('--','')]: v.split('=').slice(1).join('=')}), {});
+	const args = process.argv.slice(2).reduce((a,v)=>Object.assign(a, {[v.split(/=/)[0].replace('--','')]: v.split('=').slice(1).join('=')}), {});
 	try {
 		const credentials = args.request ? '' : (args.credentials || (await auth(args)));
 		try {
-			initApc(args.url || 'wss://apc.modelrxiv.org', credentials, generateID(6), args.threads ? +(args.threads) : 4, args.name, args.mode, args.request);
+			initApc(args.dir || '.', args.url || 'wss://apc.modelrxiv.org', credentials, generateID(6), args.threads ? +(args.threads) : 4, args.name, args.mode, args.request);
 			//return require('./apc.js').init(args.url || 'wss://apc.modelrxiv.org', credentials, args.threads ? +(args.threads) : 4, generateID(6), args.name, args.mode, args.request);
 		} catch (e) {
 			console.log('Failed to initiate APC node', e);

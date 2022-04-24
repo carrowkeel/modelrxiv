@@ -1,4 +1,14 @@
 
+const parseJSON = (text, default_value={}) => {
+	try {
+		if (text === null)
+			throw 'JSON string missing';
+		return JSON.parse(text);
+	} catch (e) {
+		return default_value;
+	}
+};
+
 const signedURL = (url, signature, query = {}) => {
 	if (!signature)
 		return url;
@@ -8,7 +18,7 @@ const signedURL = (url, signature, query = {}) => {
 
 const scriptFromSources = (sources, credentials, public_url) => { // Will support multiple sources, but currently only using the first as the script file
 	const script_source = sources[0];
-	const filename = `${['script', credentials.user_id, script_source.model_id].join('_')}.${script_source.framework === 'js' ? 'mjs' : script_source.framework}`;
+	const filename = `${['script', credentials.user_id, script_source.model_id].join('_')}.${script_source.framework === 'js' ? 'mjs' : (script_source.framework === 'node_js' ? 'js' : script_source.framework)}`;
 	const url = public_url + (script_source.private ? signedURL(`/users/${credentials.user_id}/${script_source.model_id}.${script_source.framework}`, credentials.cdn) : `/models/${script_source.model_id}.${script_source.framework}`);
 	return {id: script_source.model_id, url, filename, framework: script_source.framework};
 };
@@ -55,7 +65,7 @@ const spawnWorker = (apc, options, file_cache, workers, i, request, stream) => n
 		const parts = cache.join('').split('\n');
 		if (parts.length === 1)
 			return;
-		const messages = parts.slice(0, parts.length - 1).map(JSON.parse);
+		const messages = parts.slice(0, parts.length - 1).map(v => parseJSON(v, v));
 		cache.length = 0;
 		cache.push(parts[parts.length - 1]);
 		for (const message of messages) {
@@ -63,9 +73,12 @@ const spawnWorker = (apc, options, file_cache, workers, i, request, stream) => n
 				case 'dynamics':
 					stream(message.data);
 					break;
-				default:
+				case 'result':
 					stream(null);
 					resolve(message.data);
+					break;
+				default:
+					console.log(message);
 			}
 		}
 	});
@@ -101,12 +114,22 @@ const workerQueue = (apc, options, workers=Array.from(new Array(options.threads)
 const processRequest = (options, queue, request, request_id, user) => new Promise(async (resolve, reject) => {
 	switch(options.mode) {
 		case 'slurm':
+			const exec = require('util').promisify(require('child_process').exec);
 			await require('fs/promises').writeFile(`${request_id}.request`, JSON.stringify(Object.assign(request, {credentials: options.credentials, request_id, user})));
-			require('child_process').exec(`sbatch --time=01:00:00 --mem=1G --ntasks=${options.machine.capacity} --wrap="node init.js --threads=${options.machine.capacity} --request=${request_id}.request;"`, err => {
-				if (err)
-					return reject();
-				return resolve();
-			});
+			await exec(`mkfifo ${request_id}.output`);
+			exec(`sbatch --time=01:00:00 --mem=1G --ntasks=${options.machine.capacity} --wrap="node init.js --threads=${options.machine.capacity} --request=${request_id}.request;"`)
+				.catch(reject)
+				.then(() => {
+					const output_stream = require('fs').createReadStream(`${request_id}.output`);
+					const chunks = [];
+					output_stream.on('data', data => {
+						chunks.push(data.toString());
+					});
+					output_stream.on('close', () => {
+						// Delete pipe file
+						resolve(JSON.parse(chunks.join('')));
+					});
+				});
 		case 'subprocess':
 		default:
 			switch(true) {
@@ -126,22 +149,26 @@ const processRequest = (options, queue, request, request_id, user) => new Promis
 const addResource = (apc, options, resources, resource, initial=false) => {
 	if (!initial && (resource.machine_id === options.id))
 		return;
-	Object.keys(resources).filter(connection_id => resources[connection_id].dataset.machine_id === resource.machine_id).forEach(connection_id => delete resources[connection_id]);
+	const current = Object.keys(resources).filter(connection_id => resources[connection_id].dataset.machine_id === resource.machine_id);
+	if (current.length > 0)
+		return current.forEach(connection_id => resources[connection_id].emit('connected'));
 	resources[resource.connection_id] = require('./add_module').addModule('resource', {apc, resource, frameworks: resource.frameworks, machine_id: resource.machine_id, connection_id: resource.connection_id});
 	return resources[resource.connection_id];
 };
 
 const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
 	hooks: [
-		['init', () => {
+		['init', async () => {
 			storage.local_queue = workerQueue(module, options);
 			const local_resource = {machine_id: options.id, type: 'node', name: options.name, capacity: request ? 0 : options.threads, cost: 0, time: 100, frameworks: options.frameworks.join(',')};
 			addResource(module, options, storage.resources, Object.assign({}, local_resource, {connection_id: 'local'}), true);
 			if (request) {
-				// For slurm mode, run job and connect to send results, think how to combine with rtc which requires a longer connection process
-				// await processRequest(options, queue, request).then(result => require('./ws').wsConnectSend(websocket_url, options, request.user, request.request_id, result));
-			}
-			storage.ws = require('./add_module').addModule('ws', {apc: module, options, local: local_resource});
+				const results = await new Promise(resolve => module.emit('job', request, resolve));
+				const output_stream = require('fs').createWriteStream(`${request_id}.output`);
+				output_stream.write(JSON.stringify(results));
+				output_stream.end();
+			} else
+				storage.ws = require('./add_module').addModule('ws', {apc: module, options, local: local_resource});
 		}],
 		['job', async (request, resolve) => {
 			processRequest(options, storage.local_queue, request.data, request.request_id, request.user)
@@ -158,8 +185,7 @@ const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
 				case 'connected':
 					return addResource(module, options, storage.resources, message.data);
 				case 'disconnected':
-					delete storage.resources[message.connection_id];
-					break;
+					return storage.resources[message.connection_id].emit('disconnected');
 				default:
 					return storage.resources[message.user].emit('message', message);
 			}

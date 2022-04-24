@@ -43,34 +43,6 @@ const wsSend = async (ws, request, websocket_frame_limit = 30 * 1024, compressio
 		ws.sendUTF(JSON.stringify(Object.assign(request, {compression: compression_type, data: compressed})));
 };
 
-const wsConnectSend = (websocket_url, options, user, request_id, result, attempt=0, retries=3) => new Promise((resolve, reject) => {
-	const params = new URLSearchParams({authorization: options.credentials.token, ...options.machine});
-	const WebSocketClient = require('websocket').client;
-	const ws = new WebSocketClient();
-	ws.on('connectFailed', e => {
-		console.log('WebSocket connection failed', e);
-		if (attempt < retries)
-			wsConnectSend(websocket_url, options, user, request_id, data, attempt + 1);
-		else {
-			require('fs/promises').writeFile(`${request_id}.result`, JSON.stringify(result));
-			reject();
-		}
-	});
-	ws.on('connect', connection => {
-		connection.on('close', () => {
-			console.log('Websocket disconnected');
-		});
-		connection.on('error', e => {
-			console.log('WebSocket error', e);
-			require('fs/promises').writeFile(`${request_id}.result`, JSON.stringify(result));
-		});
-		wsSend(connection, {type: 'result', request_id: request_id, user, machine_id: options.machine.id}, result);
-		connection.close();
-		resolve();
-	});
-	ws.connect(`${websocket_url}/?${params.toString()}`);
-});
-
 const wsConnect = (module, websocket_url, options, receiving=[]) => {
 	const WebSocketClient = require('websocket').client;
 	const ws = new WebSocketClient();
@@ -123,8 +95,6 @@ const ws = (module, {apc, options, local}, storage={receiving: [], status: 'disc
 		}],
 		['send', data => {
 			return wsSend(storage.ws, data);
-			// From job
-			//return wsSend(connection, {type: 'result', request_id: request.request_id, user: request.user, machine_id: options.machine.id, data: result});
 		}],
 		['message', message => {
 			apc.emit('message', message);
