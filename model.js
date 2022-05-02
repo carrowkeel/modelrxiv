@@ -14,7 +14,7 @@ const fieldsFromForm = (input_params, query) => {
 				case 'cont':
 					return `<input type="text" data-type="${type}" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}"><input type="text" class="range" name="${name}" value="${range[0]}" title="${description} range start"><input type="text" class="range" name="${name}" value="${range[1]}" title="${description} range end"><input type="text" class="range" name="${name}" value="5" title="${description} resolution (2^x)">`;
 				case 'disc':
-					return values ? `<select class="value" data-type="cont" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">${values.map(flag => `<option value="${flag.name}">${flag.name}</option>`).join('')}</select>` : `<input type="text" data-type="${type}" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">`;
+					return values ? `<select class="value" data-type="cont" name="${name}" title="${description}">${values.map(flag => `<option value="${flag.name}"${(query && query[name] !== undefined ? query[name] : default_value) === flag.name ? 'selected' : ''}>${flag.name}</option>`).join('')}</select>` : `<input type="text" data-type="${type}" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">`;
 				case 'json':
 					return `<input type="text" data-type="json" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">`;
 			}
@@ -175,7 +175,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 		}],
 		['[data-module="model"]', 'run', async e => {
 			const plots_container = elem.querySelector('.plots');
-			const step_interval = 10;
+			const step_interval = localStorage.getItem('mdx_step_interval') || 10;
 			if (!storage.loop || e.detail?.reset) {
 				await new Promise(resolve => e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false, resolve}})));
 				const request = {framework: entry.framework, sources: [{type: 'script', private: entry.private, model_id: entry.model_id, framework: entry.framework}], params: storage.params};
@@ -204,11 +204,13 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'P');
 		}],
 		['[data-module="model"]', 'run_browser', async e => {
+			const step_interval = localStorage.getItem('mdx_step_interval') || 10;
 			if (storage.step_module === undefined || e.detail?.reload) {
 				storage.step_module = entry.framework === 'js' ? await import(`${entry.module_url}${e.detail?.reload ? `?${new Date().getTime()}` : ''}`) : (entry.framework === 'py' ? await pythonModuleWrapper(entry, e.detail?.reload) : false);
 			}
 			if (!storage.loop || e.detail?.reset) {
-				e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false}}));
+				//e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false}}));
+				await new Promise(resolve => e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false, resolve}})));
 				const stats = []; // Rename
 				if (storage.timeout)
 					clearTimeout(storage.timeout);
@@ -220,7 +222,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 					const step = stepWrapper(elem, storage.step_module, storage.params, _step, stats);
 					if (!step)
 						return e.target.dispatchEvent(new Event('stopped'));
-					storage.timeout = setTimeout(storage.loop, 10, step);
+					storage.timeout = setTimeout(storage.loop, step_interval, step);
 				};
 			}
 			if (e.target.dataset.state !== 'paused')

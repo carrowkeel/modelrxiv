@@ -101,7 +101,7 @@ const plot_types = [
 		label: 'Scatter plot (RT)',
 		input: {x: ['cont'], y: ['cont']},
 		draw: (draw, data, x, r=2, opacity=0.5) => {
-			Object.keys(data[data.length - 1]).forEach(group => data[data.length - 1][group].forEach(point => draw.point(point, group, r, opacity)));
+			Object.keys(data[data.length - 1]).forEach(group => data[data.length - 1][group].forEach(point => draw.point(point, group, r, point[2] !== undefined ? point[2] : opacity)));
 		}
 	},
 	{
@@ -130,7 +130,7 @@ const plot_types = [
 		draw: (draw, data, x) => {
 			const opacity = 0.1/(0.1 + Math.log(data[0].length));
 			const mean_line = data.map(mean);
-			if (data[0].length >= 50) {
+			if (data[0].length > 50) {
 				const std = data.map(stddev);
 				const points = mean_line.map((m,i) => [x + i, m - std[i]]).concat(mean_line.map((m,i) => [x + (mean_line.length - 1 - i), mean_line[mean_line.length - 1 - i] + std[mean_line.length - 1 - i]]));
 				draw.polygon(points, color_cycle[0], 0.1);
@@ -375,7 +375,7 @@ export const plot = (env, {job}, elem, storage={}) => ({
 			plot_element.dataset.plot = plot.type; // Fix
 			for (const prop in plot)
 				plot_element.dataset[prop] = typeof plot[prop] !== 'string' ? JSON.stringify(plot[prop]) : plot[prop];
-			plot_element.innerHTML = `<div class="console"></div><div class="crosshair"></div><div class="axis-label label-x">${formatLabel(plot.labels.x)}</div><div class="axis-label label-y">${formatLabel(plot.labels.y)}</div>${plot.xbounds[0] === plot.ybounds[0] ? `<div class="axis-tick min">${shorten(plot.xbounds[0])}</div>` : `<div class="axis-tick xmin">${shorten(plot.xbounds[0])}</div><div class="axis-tick ymin editable" title="Edit y-axis">${shorten(plot.ybounds[0])}</div>`}<div class="axis-tick xmax">${shorten(plot.xbounds[1])}</div><div class="axis-tick ymax editable" title="Edit y-axis">${shorten(plot.ybounds[1])}</div></div>`;
+			plot_element.innerHTML = `<div class="console"></div><div class="crosshair"></div><div class="axis-label label-x">${formatLabel(plot.labels.x)}</div><div class="axis-label label-y">${formatLabel(plot.labels.y)}</div>${false && plot.xbounds[0] === plot.ybounds[0] ? `<div class="axis-tick min">${shorten(plot.xbounds[0])}</div>` : `<div class="axis-tick xmin">${shorten(plot.xbounds[0])}</div><div class="axis-tick ymin editable" title="Edit y-axis">${shorten(plot.ybounds[0])}</div>`}<div class="axis-tick xmax">${shorten(plot.xbounds[1])}</div><div class="axis-tick ymax editable" title="Edit y-axis">${shorten(plot.ybounds[1])}</div></div>`;
 			elem.querySelector('.draw_area').appendChild(plot_element);
 			const bounds = [plot.xbounds, plot.ybounds];
 			const draw = plot.type === 'proportion_plot' || plot.draw === 'canvas' ? createCanvas(plot_element, bounds) : createSVG(plot_element, bounds);
