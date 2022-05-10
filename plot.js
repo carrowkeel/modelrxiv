@@ -63,8 +63,8 @@ export const plotsFromOutput = (model) => { // Should take model.dynamics_params
 		return {
 			name: output.name,
 			draw: output.type === 'grid' ? 'canvas' : 'svg',
-			type: output.type === 'grid' ? 'hist_2d' : (output.type === 'vector' ? 'scatter_rt' : (output.type === 'repeats' ? 'lines' : 'line_plot')), // TODO: function for mapping types to plots
-			xbounds: output.type === 'vector' || output.type === 'grid' ? (output.range ? output.range.split(',').map(v => !isNaN(v) ? +(v) : v) : [0, 1]) : [0, 'target_steps'],
+			type: output.type === 'grid' ? 'hist_2d' : (output.type === 'lines' ? 'lines' : (output.type === 'vector' ? 'scatter_rt' : (output.type === 'repeats' ? 'repeats' : 'line_plot'))), // TODO: function for mapping types to plots
+			xbounds: output.type === 'vector' || output.type === 'lines' || output.type === 'grid' ? (output.range ? output.range.split(',').map(v => !isNaN(v) ? +(v) : v) : [0, 1]) : [0, 'target_steps'],
 			ybounds: output.range ? output.range.split(',').map(v => !isNaN(v) ? +(v) : v) : [0, 1],
 			labels: {title: output.label, x: model.time || 'Steps', y: output.units || output.label}
 		};
@@ -100,17 +100,9 @@ const plot_types = [
 		slug: 'scatter_rt',
 		label: 'Scatter plot (RT)',
 		input: {x: ['cont'], y: ['cont']},
-		draw: (draw, data, x, r=2, opacity=0.5) => {
+		draw: (draw, data, x, r=5, opacity=0.5) => {
 			Object.keys(data[data.length - 1]).forEach(group => data[data.length - 1][group].forEach(point => draw.point(point, group, r, point[2] !== undefined ? point[2] : opacity)));
 		}
-	},
-	{
-		slug: 'line_plot_x',
-		label: 'Line plot (x)',
-		input: {x: ['cont'], y: ['cont']},
-		draw: (draw, data) => {
-			Object.keys(data[0]).forEach(i=>draw.line_x(data.map(step => step[i]), color_cycle[i]));
-		},
 	},
 	{
 		slug: 'line_plot',
@@ -124,8 +116,24 @@ const plot_types = [
 		},
 	},
 	{
+		slug: 'line_plot_x',
+		label: 'Line plot (x)',
+		input: {x: ['cont'], y: ['cont']},
+		draw: (draw, data) => {
+			Object.keys(data[0]).forEach(i=>draw.line_x(data.map(step => step[i]), color_cycle[i]));
+		},
+	},
+	{
 		slug: 'lines',
 		label: 'Lines',
+		input: {x: ['cont'], y: ['cont']},
+		draw: (draw, data) => {
+			Object.keys(data[data.length - 1]).forEach(i=>draw.line_x(data[data.length - 1][i], color_cycle[i]));
+		},
+	},
+	{
+		slug: 'repeats',
+		label: 'Repeats',
 		input: {y: ['cont']},
 		draw: (draw, data, x) => {
 			const opacity = 0.1/(0.1 + Math.log(data[0].length));
@@ -397,7 +405,7 @@ export const plot = (env, {job}, elem, storage={}) => ({
 						}
 					});
 					break;
-				case ['line_plot', 'line_plot_x', 'lines'].includes(plots[0].plot):
+				case ['line_plot', 'line_plot_x', 'repeats', 'lines'].includes(plots[0].plot):
 					selector.innerHTML = `<a>${plots.length === 1 ? formatLabel(plots[0].labels.title) : formatLabel(plots[0].labels.y)}</a>`;
 					elem.querySelector('.legend').innerHTML = plots.length === 1 ? '' : plots.map(plot => {
 						return `<a data-line="${plot.name}">${formatLabel(plot.labels.title)}</a>`;
