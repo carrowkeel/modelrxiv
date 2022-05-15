@@ -34,7 +34,8 @@ const pythonModuleWrapper = async (module, reload=false) => ({
 			if (typeof loadPyodide !== 'function')
 				await loadScript('/pyodide/pyodide.js');
 			const pyodide = await loadPyodide({indexURL: 'https://modelrxiv.org/pyodide/'});
-			await pyodide.loadPackage('numpy'); // Fix
+			await pyodide.loadPackage('numpy');
+			await pyodide.loadPackage('matplotlib');
 			if (module.modules) {
 				for (const module_name of module.modules.split(','))
 					await pyodide.loadPackage(module_name);
