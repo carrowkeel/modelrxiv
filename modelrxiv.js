@@ -340,9 +340,32 @@ const getCredentials = (type) => { // Add same or combined for setting credentia
 	}
 };
 
+const initServiceWorker = (uri) => new Promise((resolve, reject) => {
+	if ('serviceWorker' in navigator) {
+		return navigator.serviceWorker.register(uri, {scope: '/images/'}).then(reg => {
+			if (!reg.waiting && !reg.active) {
+				reg.addEventListener('updatefound', () => {
+					reg.installing.addEventListener('statechange', e => {
+						if (e.target.state === "activated") {
+							resolve();
+						}
+					});
+				});
+			} else
+				resolve();
+		}).catch(e => {
+			console.log('Failed to register sw.js: ' + e);
+			reject();
+		});
+	} else
+		return reject();
+});
+
+
 const init = async () => {
 	const env = {static_pages: {login: 'Login', register: 'Register', privacy: 'Privacy', terms: 'Terms', contribute: 'Contribute'}, db: staticDB({uri: 'https://modelrxiv.org'}), processes: {}, timeouts: {}};
 	addHooks(window, hooks(env));
+	await initServiceWorker('/sw.js');
 	await auth(env);
 	addModule(document.querySelector('.apocentric'), 'apc', {options: {getCredentials, worker_script: '/worker.js', url: 'wss://apc.modelrxiv.org', threads: navigator.hardwareConcurrency, frameworks: ['js', 'py']}}, true);
 	window.addEventListener('popstate', e => {

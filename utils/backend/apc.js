@@ -74,6 +74,7 @@ const spawnWorker = (apc, options, file_cache, workers, i, request, stream) => n
 					stream(message.data);
 					break;
 				case 'result':
+					stream(message.data);
 					stream(null);
 					resolve(message.data);
 					break;

@@ -109,7 +109,14 @@ const plot_types = [
 		label: 'Image',
 		input: {x: ['cont'], y: ['cont']},
 		draw: (draw, data, x) => {
-			console.log(data);
+			const key = Math.round(Math.random()*1e10).toString();
+			caches.open('mdx_cache').then(cache => {
+				const binary_string = atob(data);
+				const image_data = new Uint8Array(binary_string.length);
+				for (const i in image_data)
+					image_data[i] = binary_string.charCodeAt(i);
+				return cache.put(new Request(`/images/${key}`), new Response(image_data, {headers: {'Content-Type': 'image/png'}}));
+			});
 		}
 	},
 	{
