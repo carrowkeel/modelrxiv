@@ -13,9 +13,10 @@ const cacheResponse = (request, response) => {
 
 const routeRequest = async (request) => {
 	const url = new URL(request.url);
-	if (url.origin === mdx_origin)
+	if (url.origin === mdx_origin && url.pathname.startsWith('/images/')) {
+		const response = await fetch(request);
 		return cacheResponse(request, response);
-	else
+	} else
 		return fetch(request);
 };
 

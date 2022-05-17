@@ -110,12 +110,14 @@ const plot_types = [
 		input: {x: ['cont'], y: ['cont']},
 		draw: (draw, data, x) => {
 			const key = Math.round(Math.random()*1e10).toString();
-			caches.open('mdx_cache').then(cache => {
+			caches.open('mdx_cache').then(async cache => {
 				const binary_string = atob(data);
 				const image_data = new Uint8Array(binary_string.length);
 				for (const i in image_data)
 					image_data[i] = binary_string.charCodeAt(i);
-				return cache.put(new Request(`/images/${key}`), new Response(image_data, {headers: {'Content-Type': 'image/png'}}));
+				const uri = `/images/${key}.png`;
+				await cache.put(new Request(uri), new Response(image_data, {headers: {'Content-Type': 'image/png'}}));
+				draw.image(uri, 256, 256);
 			});
 		}
 	},
@@ -282,6 +284,9 @@ const svg_draw = (svg, bounds=[[0, 1], [0, 1]], dims=[svg.dataset.width, svg.dat
 	text: function (text, x, y, classname='', transform='') {
 		const elem = this.element('text', {x, y, 'class': classname, transform});
 		elem.textContent = text;
+	},
+	image: function (href, width, height, classname='') {
+		const elem = this.element('image', {href, width, height, 'class': classname});
 	},
 	grid: function (gridres=40) {
 		const xres = dims[0] / Math.floor(dims[0] / gridres);

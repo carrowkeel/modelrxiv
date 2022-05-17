@@ -342,7 +342,7 @@ const getCredentials = (type) => { // Add same or combined for setting credentia
 
 const initServiceWorker = (uri) => new Promise((resolve, reject) => {
 	if ('serviceWorker' in navigator) {
-		return navigator.serviceWorker.register(uri, {scope: '/images/'}).then(reg => {
+		return navigator.serviceWorker.register(uri, {scope: '/'}).then(reg => {
 			if (!reg.waiting && !reg.active) {
 				reg.addEventListener('updatefound', () => {
 					reg.installing.addEventListener('statechange', e => {
