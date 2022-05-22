@@ -365,7 +365,8 @@ const initServiceWorker = (uri) => new Promise((resolve, reject) => {
 const init = async () => {
 	const env = {static_pages: {login: 'Login', register: 'Register', privacy: 'Privacy', terms: 'Terms', contribute: 'Contribute'}, db: staticDB({uri: 'https://modelrxiv.org'}), processes: {}, timeouts: {}};
 	addHooks(window, hooks(env));
-	await initServiceWorker('/sw.js');
+	if (localStorage.getItem('mdx_state') === 'test')
+		await initServiceWorker('/sw.js');
 	await auth(env);
 	addModule(document.querySelector('.apocentric'), 'apc', {options: {getCredentials, worker_script: '/worker.js', url: 'wss://apc.modelrxiv.org', threads: navigator.hardwareConcurrency, frameworks: ['js', 'py']}}, true);
 	window.addEventListener('popstate', e => {

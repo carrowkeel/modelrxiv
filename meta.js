@@ -121,7 +121,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 			});
 			break;
 		}
-		case 3: { // At the moment this is mainly relevant for discrete values
+		case 3: { // At the moment this is for discrete parameters only
 			const stat = entry.result_params[0].name; // Temporary to avoid breaking this
 			const combine = (values) => {
 				return values.reduce((a,v) => {
@@ -140,6 +140,8 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 				});
 			});
 			const keys = Object.keys(values.reduce((a, v) => Object.keys(v).reduce((_a, k) => Object.assign(_a, {[k]: 1}), a), {}));
+			const output_values = entry.result_params[0].values.reduce((a,v) => Object.assign(a, {[v.name]: v.value}), {});
+			const sorted_keys = keys.sort((a,b) => output_values[a] - output_values[b]);
 			const lines = values.map((value, i) => keys.map(_i => [axes.z[i], value[_i] ? value[_i] : 0]));
 			const {module: plot_module} = await addModule(group, 'plot');
 			plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
