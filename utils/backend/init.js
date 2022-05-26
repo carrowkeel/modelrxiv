@@ -52,7 +52,7 @@ const main = async () => {
 	try {
 		const credentials = args.request ? '' : (args.credentials || (await auth(args)));
 		try {
-			initApc(args.dir || '.', args.url || 'wss://apc.modelrxiv.org', credentials, generateID(6), args.threads ? +(args.threads) : 4, args.name, args.mode, args.request);
+			initApc(args.dir || '.', args.url || 'wss://apc.modelrxiv.org', credentials, args.id || generateID(6), args.threads ? +(args.threads) : 4, args.name, args.mode, args.request);
 		} catch (e) {
 			console.log('Failed to initiate APC node', e);
 		}

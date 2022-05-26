@@ -63,7 +63,7 @@ export const plotsFromOutput = (model) => { // Should take model.dynamics_params
 		return {
 			name: output.name,
 			draw: output.type === 'grid' ? 'canvas' : 'svg',
-			type: output.type === 'grid' ? 'hist_2d' : (output.type === 'lines' ? 'lines' : (output.type === 'vector' ? 'scatter_rt' : (output.type === 'repeats' ? 'line_repeats' : 'line_plot'))), // TODO: function for mapping types to plots
+			type: output.type === 'grid' ? 'hist_2d' : (output.type === 'image' ? 'image' : (output.type === 'lines' ? 'lines' : (output.type === 'vector' ? 'scatter_rt' : (output.type === 'repeats' ? 'line_repeats' : 'line_plot')))), // TODO: function for mapping types to plots
 			xbounds: output.type === 'vector' || output.type === 'lines' || output.type === 'grid' ? (output.range ? output.range.split(',').map(v => !isNaN(v) ? +(v) : v) : [0, 1]) : [0, 'target_steps'],
 			ybounds: output.range ? output.range.split(',').map(v => !isNaN(v) ? +(v) : v) : [0, 1],
 			labels: {title: output.label, x: model.time || 'Steps', y: output.units || output.label}
@@ -102,6 +102,23 @@ const plot_types = [
 		input: {x: ['cont'], y: ['cont']},
 		draw: (draw, data, x, r=5, opacity=0.5) => {
 			Object.keys(data[data.length - 1]).forEach(group => data[data.length - 1][group].forEach(point => draw.point(point, group, r, point[2] !== undefined ? point[2] : opacity)));
+		}
+	},
+	{
+		slug: 'image',
+		label: 'Image',
+		input: {x: ['cont'], y: ['cont']},
+		draw: (draw, data, x) => {
+			const key = Math.round(Math.random()*1e10).toString();
+			caches.open('mdx_cache').then(async cache => {
+				const binary_string = atob(data);
+				const image_data = new Uint8Array(binary_string.length);
+				for (const i in image_data)
+					image_data[i] = binary_string.charCodeAt(i);
+				const uri = `/images/${key}.png`;
+				await cache.put(new Request(uri), new Response(image_data, {headers: {'Content-Type': 'image/png'}}));
+				draw.image(uri, 256, 256);
+			});
 		}
 	},
 	{
@@ -267,6 +284,9 @@ const svg_draw = (svg, bounds=[[0, 1], [0, 1]], dims=[svg.dataset.width, svg.dat
 	text: function (text, x, y, classname='', transform='') {
 		const elem = this.element('text', {x, y, 'class': classname, transform});
 		elem.textContent = text;
+	},
+	image: function (href, width, height, classname='') {
+		const elem = this.element('image', {href, width, height, 'class': classname});
 	},
 	grid: function (gridres=40) {
 		const xres = dims[0] / Math.floor(dims[0] / gridres);

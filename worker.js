@@ -15,6 +15,7 @@ const pythonModuleWrapper = async (module_url, reload=false) => ({
 		try {
 			const pyodide = await loadPyodide({indexURL: 'https://modelrxiv.org/pyodide/'});
 			await pyodide.loadPackage('numpy'); // NumPy loaded by default, implement module definition in model builder
+			await pyodide.loadPackage('matplotlib');
 			return pyodide;
 		} catch (e) {
 			return pyodide;
@@ -22,33 +23,33 @@ const pythonModuleWrapper = async (module_url, reload=false) => ({
 	})(),
 	defaults: function () {
 		const code = `${this.module}
-result = defaults()
+output = defaults()
 `;
 		this.pyodide.runPython(code);
-		const outputPr = this.pyodide.globals.get('result');
+		const outputPr = this.pyodide.globals.get('output');
 		const result = outputPr.toJs();
 		outputPr.destroy();
 		return result instanceof Map ? Object.fromEntries(result) : result;
 	},
-	step: function (params, _step, t) {
+	step: !this.module.match('def step(') ? undefined : function (params, _step, t) {
 		const code = `${this.module}
-result = step(params, _step, ${t})
+output = step(params, _step, ${t})
 `;
 		this.pyodide.globals.set('params', this.pyodide.toPy(params));
 		this.pyodide.globals.set('_step', this.pyodide.toPy(_step));
 		this.pyodide.runPython(code);
-		const outputPr = this.pyodide.globals.get('result');
+		const outputPr = this.pyodide.globals.get('output');
 		const result = outputPr.toJs();
 		outputPr.destroy();
 		return result instanceof Map ? Object.fromEntries(result) : result;
 	},
 	run: function (params) {
 		const code = `${this.module}
-result = run(params)
+output = run(params)
 `;
 		this.pyodide.globals.set('params', this.pyodide.toPy(params));
 		this.pyodide.runPython(code);
-		const outputPr = this.pyodide.globals.get('result');
+		const outputPr = this.pyodide.globals.get('output');
 		const result = outputPr.toJs();
 		outputPr.destroy();
 		return result instanceof Map ? Object.fromEntries(result) : result;
@@ -107,7 +108,7 @@ self.addEventListener("message", async e => {
 	switch(true) {
 		case request.fixed_params.test:
 			return test(script, request.framework).then(result => self.postMessage({type: 'result', data: result}));
-		case request.variable_params === undefined:
+		case request.variable_params === undefined && step_module.step:
 			const dynamics_stream = await dynamicsStream(script, request.framework, request.fixed_params);
 			while(true) {
 				const step = await dynamics_stream.next();
@@ -116,6 +117,9 @@ self.addEventListener("message", async e => {
 				self.postMessage({type: 'dynamics', data: step.value});
 			}
 			return self.postMessage({type: 'result', data: {}}); // Deriving a result here depends on step_module.result
+		case request.variable_params === undefined:
+			const step_output = (step) => process.stdout.write(JSON.stringify({type: 'dynamics', data: step})+'\n');
+			return runParams(step_module, request.fixed_params, undefined, step_output);
 		default:
 			return runParams(script, request.framework, request.fixed_params, request.variable_params).then(result => self.postMessage({type: 'result', data: result}));
 	}
