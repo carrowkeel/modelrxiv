@@ -3,19 +3,30 @@ const resource = (module, {apc, resource, settings}, storage={}) => ({
 	hooks: [
 		['init', () => { // May not be necessary
 			const threads = settings ? settings.used : resource.capacity;
+			module.dataset.connectionState = 1;
 			storage.used = threads;
 		}],
 		['wsconnected', (connection_id) => {
 			if (connection_id)
 				module.dataset.connection_id = connection_id;
-			module.dataset.connectionStatus |= 1;
+			module.dataset.connectionState |= 1;
+			module.emit('connectionstatechange');
 		}],
 		['wsdisconnected', () => {
-			module.dataset.connectionStatus &= ~1;
+			module.dataset.connectionState &= ~1;
+			module.emit('connectionstatechange');
 		}],
 		['establishrtc', () => {
 			const connection_id = module.dataset.connection_id;
 			storage.rtc = require('./add_module').addModule('rtc', {resource: module, connection_id});
+			storage.rtc.on('connected', e => {
+				module.dataset.connectionState |= 2;
+				module.emit('connectionstatechange');
+			});
+			storage.rtc.on('disconnected', e => {
+				module.dataset.connectionState &= ~2;
+				module.emit('connectionstatechange');
+			});
 			storage.rtc.emit('connect');
 		}],
 		['processrtc', rtc_data => {

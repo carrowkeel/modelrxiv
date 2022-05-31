@@ -204,16 +204,16 @@ a.logo {
 	border-left: 4px solid #eee;
 	border-bottom: 1px solid #fafafa;
 }
-[data-module="resource"][data-connection-status="0"] {
+[data-module="resource"][data-connection-state="0"] {
 	border-left-color: #daa;
 }
-[data-module="resource"][data-connection-status="1"] {
+[data-module="resource"][data-connection-state="1"] {
 	border-left-color: #aad;
 }
-[data-module="resource"][data-connection-status="2"] {
+[data-module="resource"][data-connection-state="2"] {
 	border-left-color: #dda;
 }
-[data-module="resource"][data-connection-status="3"] {
+[data-module="resource"][data-connection-state="3"] {
 	border-left-color: #ada;
 }
 .user-menu [data-framework] {

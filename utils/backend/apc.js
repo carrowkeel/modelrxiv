@@ -74,8 +74,10 @@ const spawnWorker = (apc, options, file_cache, workers, i, request, stream) => n
 					stream(message.data);
 					break;
 				case 'result':
-					stream(message.data);
-					stream(null);
+					if (stream) {
+						stream(message.data);
+						stream(null);
+					}
 					resolve(message.data);
 					break;
 				default:
@@ -154,6 +156,10 @@ const addResource = (apc, options, resources, resource, initial=false) => {
 	if (current.length > 0)
 		return current.forEach(connection_id => resources[connection_id].emit('wsconnected', resource.connection_id));
 	resources[resource.connection_id] = require('./add_module').addModule('resource', {apc, resource, frameworks: resource.frameworks, machine_id: resource.machine_id, connection_id: resource.connection_id});
+	resources[resource.connection_id].on('connectionstatechange', () => {
+		if (resources[resource.connection_id].dataset.connectionState === 0)
+			delete resources[resource.connection_id];
+	});
 	return resources[resource.connection_id];
 };
 

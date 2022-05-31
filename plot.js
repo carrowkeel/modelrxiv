@@ -111,13 +111,17 @@ const plot_types = [
 		draw: (draw, data, x) => {
 			const key = Math.round(Math.random()*1e10).toString();
 			caches.open('mdx_cache').then(async cache => {
-				const binary_string = atob(data);
-				const image_data = new Uint8Array(binary_string.length);
-				for (const i in image_data)
-					image_data[i] = binary_string.charCodeAt(i);
-				const uri = `/images/${key}.png`;
-				await cache.put(new Request(uri), new Response(image_data, {headers: {'Content-Type': 'image/png'}}));
-				draw.image(uri, 256, 256);
+				try {
+					const binary_string = atob(data[data.length - 1]);
+					const image_data = new Uint8Array(binary_string.length);
+					for (const i in image_data)
+						image_data[i] = binary_string.charCodeAt(i);
+					const uri = `/images/${key}.png`;
+					await cache.put(new Request(uri), new Response(image_data, {headers: {'Content-Type': 'image/png'}}));
+					draw.image(uri, 512, 256);
+				} catch (e) {
+					// Image data is corrupted
+				}
 			});
 		}
 	},
