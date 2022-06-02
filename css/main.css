@@ -950,7 +950,7 @@ polygon.proportion:hover {
 .entry .values {
 	position: absolute;
 	z-index: 100;
-	width: 100%;
+	width: 320px;
 	right: 0;
 	top: 29px;
 	display: flex;

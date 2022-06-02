@@ -112,7 +112,7 @@ const populateForm = (form, data) => {
 	Object.entries(data).forEach(([name, value]) => {
 		if (value instanceof Array) {
 			value.forEach(entry => { // TODO: combine with cloneEntry
-				if (Array.from(form.querySelectorAll(`[data-entry="${name}"] [name="name"]`)).filter(item => item.value === entry.name).length > 0)
+				if (Array.from(form.querySelectorAll(`[data-entry="${name}"]>[name="name"]`)).filter(item => item.value === entry.name).length > 0)
 					return;
 				const empty = form.querySelector(`[data-entry="${name}"]:last-child`);
 				const cloned = empty.cloneNode(true);
@@ -197,6 +197,8 @@ const hooks = (env, entry, query, elem) => [
 	}],
 	['[name="type"]', 'change', e => {
 		const entry = e.target.closest('.entry');
+		if (!entry)
+			return;
 		const type = e.target.value;
 		entry.querySelectorAll('[data-range]').forEach(item => item.style.display = 'none');
 		entry.querySelector(`[data-range*="${type}"]`).style.display = 'block';
