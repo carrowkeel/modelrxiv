@@ -216,25 +216,25 @@ a.logo {
 [data-module="resource"][data-connection-state="3"] {
 	border-left-color: #ada;
 }
-.user-menu [data-framework] {
+[data-framework] {
 	padding: 2px 5px;
 	background: #eee;
 	margin-right: 4px;
 	color: #555;
 }
-.user-menu [data-framework="js"] {
+[data-framework="js"] {
 	background: #f7df1e;
 	color: #000;
 }
-.user-menu [data-framework="node.js"] {
+[data-framework="node.js"] {
 	background: #23a133;
 	color: #fff;
 }
-.user-menu [data-framework="py"] {
+[data-framework="py"] {
 	background: #306998;
 	color: #fff;
 }
-.user-menu [data-framework="R"] {
+[data-framework="R"] {
 	color: #2468bb;
 }
 .user-menu .frameworks {

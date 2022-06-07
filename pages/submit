@@ -15,7 +15,7 @@
 </div>
 </div>
 <div class="section">
-<h3><a data-action="save-code" class="fright button orange">Save</a><a data-action="test-code" class="fright button orange">Test</a><select class="fright" name="framework"><option value="js">JavaScript</option><option value="nodejs">JavaScript (Node.js)</option><option value="py">Python 3</option><option value="R">R</option></select><a data-action="build-code" class="fright button orange disabled">Build</a>Script <span class="switch"><a data-action="builder">Builder</a> | <a data-action="source" class="disabled">Source</a></span></h3>
+<h3><a data-action="save-code" class="fright button orange">Save</a><a data-action="test-code" class="fright button orange">Test</a><select class="fright" name="framework"><option value="js">JavaScript</option><option value="node.js">JavaScript (Node.js)</option><option value="py">Python 3</option><option value="R">R</option></select><a data-action="build-code" class="fright button orange disabled">Build</a>Script <span class="switch"><a data-action="builder">Builder</a> | <a data-action="source" class="disabled">Source</a></span></h3>
 <div class="content">
 <div class="editor builder hide"><div class="error"></div><textarea name="pseudocode"></textarea></div>
 <div class="editor code"><div class="error"></div><textarea name="code"></textarea></div>
