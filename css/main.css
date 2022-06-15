@@ -1143,6 +1143,15 @@ h2 a.tag {
 [data-category="published"] {
 	background: #6885db;
 }
+.form .error {
+	padding: 10px 15px;
+	margin-bottom: 15px;
+	border: 1px solid #ba0000;
+	background: #ba000033;
+}
+.form .error:empty {
+	display: none;
+}
 .editor {
 	position: relative;
 }

@@ -4,9 +4,9 @@ import importlib
 
 def run_params(step_module, fixed_params, variable_params, step_output=None):
 	if variable_params != None:
-		return [step_module.run({**fixed_params, **params}) for params in variable_params]
+		return [replace_numpy_arrays(step_module.run({**fixed_params, **params})) for params in variable_params]
 	else:
-		return step_module.run(fixed_params, step_output=step_output)
+		return replace_numpy_arrays(step_module.run(fixed_params, step_output=step_output))
 
 def replace_numpy_arrays(result):
 	return {k: v.tolist() if type(v).__module__ == 'numpy' else v for k, v in result.items()}
@@ -38,7 +38,7 @@ def main():
 		if message['type'] != 'job':
 			continue
 		result = process_job(message['request'])
-		sys.stdout.write(json.dumps({'type': 'result', 'data': replace_numpy_arrays(result)})+'\n')
+		sys.stdout.write(json.dumps({'type': 'result', 'data': result})+'\n')
 		sys.stdout.flush()
 
 main()

@@ -196,6 +196,12 @@ const hooks = env => [
 	['[data-action="logout"]', 'click', e => {
 		document.querySelector('.mdx-auth').dispatchEvent(new Event('loggedout'));
 	}],
+	['.login-form input', 'keydown', e => {
+		if (e.keyCode === 13) {
+			const args = readForm(e.target.closest('.form'));
+			auth(env, args);
+		}
+	}],
 	['.login-button', 'click', e => {
 		const args = readForm(e.target.closest('.form'));
 		auth(env, args);
@@ -320,9 +326,12 @@ const auth = (env, login={}) => {
 					navigate(env, '/');
 			}
 			document.querySelector('.mdx-auth').dispatchEvent(new CustomEvent('authenticated', {detail: {token: auth_data.data?.token || token}}));
-		} else
-			document.querySelector('.mdx-auth').dispatchEvent(new CustomEvent('loggedout', {detail: {login: login.user_name !== undefined}}));
+		} else {
+			throw 'Authentication failed';
+		}
 	}).catch(e => {
+		document.querySelector('.mdx-auth').dispatchEvent(new CustomEvent('loggedout', {detail: {login: login.user_name !== undefined}}));
+		document.querySelectorAll('.login-form .error').forEach(item => item.innerHTML = 'Login details incorrect');
 		console.log(e);
 	});
 };
