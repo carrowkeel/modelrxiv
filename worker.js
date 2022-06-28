@@ -111,7 +111,7 @@ self.addEventListener("message", async e => {
 	switch(true) {
 		case request.fixed_params.test !== undefined:
 			return test(script, request.framework).then(result => self.postMessage({type: 'result', data: result}));
-		case request.variable_params === undefined && ((step_module.has_step === undefined && step_module.step) || step_module.has_step()):
+		case request.variable_params === undefined: // && ((step_module.has_step === undefined && step_module.step) || step_module.has_step()):
 			const dynamics_stream = await dynamicsStream(script, request.framework, request.fixed_params);
 			while(true) {
 				const step = await dynamics_stream.next();

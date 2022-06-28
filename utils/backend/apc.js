@@ -85,11 +85,13 @@ const spawnWorker = (apc, options, file_cache, workers, i, request, stream) => n
 			}
 		}
 	});
+	/*
 	apc.on('message', message => { // Example implementation of termination signal
 		if (message.type !== 'terminate' || message.request_id !== request.request_id)
 			return;
 		workers[i].kill();
 	});
+	*/
 	const script = await loadSources(file_cache, options.public_url, request.sources, options.credentials);
 	workers[i].stdin.write(JSON.stringify({type: 'job', request: Object.assign({}, request, {script: script.filename})})+'\n');
 });
@@ -178,9 +180,11 @@ const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
 				storage.ws = require('./add_module').addModule('ws', {apc: module, options, local: local_resource});
 		}],
 		['job', async (request, resolve) => {
+			console.log(`Processing job ${request.request_id}`);
 			processRequest(options, storage.local_queue, request.data, request.request_id, request.user)
 				.catch(e => console.log(`Failed to process request ${request.request_id}`, e))
-				.then(resolve);
+				.then(resolve)
+				.then(() => console.log(`Finished job ${request.request_id}`));
 		}],
 		['send', data => {
 			storage.ws.emit('send', data);
@@ -192,8 +196,18 @@ const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
 				case 'connected':
 					return addResource(module, options, storage.resources, message.data);
 				case 'disconnected':
+					if (storage.resources[message.connection_id] === undefined) {
+						console.log(`Disconnected resource ${message.connection_id} does not exist`);
+						console.log(storage.resources);
+						return;
+					}
 					return storage.resources[message.connection_id].emit('wsdisconnected');
 				default:
+					if (storage.resources[message.user] === undefined) {
+						console.log(`Resource ${message.user} does not exist`);
+						console.log(message);
+						console.log(storage.resources);
+					}
 					return storage.resources[message.user].emit('message', message);
 			}
 		}]

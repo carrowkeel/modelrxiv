@@ -190,7 +190,10 @@ const hooks = (env, entry, query, elem) => [
 	['.entry [data-action="duplicate"]', 'click', e => {
 		const empty = e.target.closest('.entry');
 		const cloned = empty.cloneNode(true);
-		empty.parentElement.appendChild(cloned);
+		if (empty.nextSibling)
+			empty.parentElement.insertBefore(cloned, empty.nextSibling);
+		else
+			empty.parentElement.appendChild(cloned);
 	}],
 	['.toggle-values', 'click', e => {
 		e.target.nextSibling.classList.toggle('hidden');

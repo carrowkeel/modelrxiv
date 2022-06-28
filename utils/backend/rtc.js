@@ -2,14 +2,17 @@
 const range = (start,end) => Array.from(Array(end-start)).map((v,i)=>i+start);
 
 const rtcReceiveParts = (channel, message_id, parts = [], n = 0) => new Promise((resolve, reject) => {
-	channel.addEventListener('message', e => { // Remove listener when resolved
+	const handle_part = e => { // Remove listener when resolved
 		const message_data = JSON.parse(e.data);
 		if (message_data.message_id !== message_id)
 			return;
 		parts.push([message_data.part, message_data.data]);
-		if (message_data.parts === parts.length)
+		if (message_data.parts === parts.length) {
+			channel.removeEventListener('message', handle_part);
 			resolve(parts.sort((a,b) => a[0] - b[0]).map(v => v[1]).join(''));
-	});
+		}
+	};
+	channel.addEventListener('message', handle_part);
 });
 
 const decodeMessage = async (channel, message_data, receiving) => {
@@ -81,6 +84,7 @@ const handleConnectionState = async (rtc_module, connection, event, user) => {
 };
 
 const createPeerConnection = (rtc_module, resource, user, ice_queue, receiving, active = true) => {
+	console.log(`create ${active ? 'active' : 'passive'} rtc connection`);
 	const google_stun = {
 		urls: [
 			'stun:stun.l.google.com:19302',
@@ -92,7 +96,7 @@ const createPeerConnection = (rtc_module, resource, user, ice_queue, receiving, 
 	};
 	const connection = new (require('wrtc')).RTCPeerConnection({iceServers: [google_stun]});
 	connection.addEventListener('icecandidate', event => sendCandidate(resource, event, user));
-	connection.addEventListener('icecandidateerror', event => console.log(event));
+	connection.addEventListener('icecandidateerror', event => {}); // Local logging
 	connection.addEventListener('signalingstatechange', event => handleSignalingState(connection, event, user));
 	connection.addEventListener('iceconnectionstatechange', event => handleConnectionState(rtc_module, connection, event, user));
 	connection.addEventListener('icegatheringstatechange', event => processIceQueue(connection, ice_queue));

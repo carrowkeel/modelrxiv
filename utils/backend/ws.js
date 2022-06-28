@@ -14,14 +14,17 @@ const decompress = base64 => {
 };
 
 const wsReceiveParts = (ws, request_id, parts = [], n = 0) => new Promise((resolve, reject) => {
-	ws.on('message', e => {
+	const handle_part = e => {
 		const message_data = JSON.parse(e.utf8Data);
 		if (message_data.request_id !== request_id)
 			return;
 		parts.push([message_data.part, message_data.data]);
-		if (message_data.parts === parts.length)
+		if (message_data.parts === parts.length) {
+			ws.off('message', handle_part);
 			resolve(parts.sort((a,b) => a[0] - b[0]).map(v => v[1]).join(''));
-	});
+		}
+	};
+	ws.on('message', handle_part);
 });
 
 const decodeMessage = async (ws, message_data, receiving) => {
