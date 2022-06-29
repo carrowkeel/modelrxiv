@@ -4,7 +4,7 @@ import importlib
 
 def run_params(step_module, fixed_params, variable_params, step_output=None):
 	if variable_params != None:
-		return [replace_numpy_arrays(step_module.run({**fixed_params, **params})) for params in variable_params]
+		return [replace_numpy_arrays(step_module.run({**fixed_params, **params}, step_output=step_output)) for params in variable_params]
 	else:
 		return replace_numpy_arrays(step_module.run(fixed_params, step_output=step_output))
 
@@ -21,16 +21,16 @@ def test(step_module):
 
 def process_job(request):
 	step_module = importlib.import_module(request['script'].replace('.py', ''))
+	def step_output(step):
+		sys.stdout.write(json.dumps({'type': 'dynamics', 'data': replace_numpy_arrays(step)})+'\n')
 	if 'test' in request['fixed_params']:
 		return test(step_module)
 	elif not 'variable_params' in request and hasattr(step_module, 'step'):
 		return {} ## Implement dynamicsStream
 	elif not 'variable_params' in request:
-		def step_output(step):
-			sys.stdout.write(json.dumps({'type': 'dynamics', 'data': replace_numpy_arrays(step)})+'\n');
 		return run_params(step_module, request['fixed_params'], None, step_output);
 	else:
-		return run_params(step_module, request['fixed_params'], request['variable_params'])
+		return run_params(step_module, request['fixed_params'], request['variable_params'], step_output)
 
 def main():
 	for line in sys.stdin:

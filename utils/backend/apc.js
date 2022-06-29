@@ -139,8 +139,9 @@ const processRequest = (options, queue, request, request_id, user) => new Promis
 		default:
 			switch(true) {
 				case request.collection !== undefined:
+					const output_stream = require('fs').createWriteStream(`${request_id}.output`);
 					return Promise.all(request.collection.map(batch => {
-						return queue({framework: request.framework, sources: request.sources, fixed_params: request.fixed_params, variable_params: batch});
+						return queue({framework: request.framework, sources: request.sources, fixed_params: request.fixed_params, variable_params: batch}, data => data ? output_stream.write(JSON.stringify(data)+'\n') : 0);
 					})).then(resolve);
 				default:
 					const {Readable} = require('stream');
