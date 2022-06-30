@@ -152,13 +152,13 @@ const processRequest = (options, queue, request, request_id, user) => new Promis
 	}
 });
 
-const addResource = (apc, options, resources, resource, initial=false) => {
+const addResource = (apc, options, resources, resource, initial=false, active=false) => {
 	if (!initial && (resource.machine_id === options.id))
 		return;
 	const current = Object.keys(resources).filter(connection_id => resources[connection_id].dataset.machine_id === resource.machine_id);
 	if (current.length > 0)
 		return current.forEach(connection_id => resources[connection_id].emit('wsconnected', resource.connection_id));
-	resources[resource.connection_id] = require('./add_module').addModule('resource', {apc, resource, frameworks: resource.frameworks, machine_id: resource.machine_id, connection_id: resource.connection_id});
+	resources[resource.connection_id] = require('./add_module').addModule('resource', {apc, resource, frameworks: resource.frameworks, machine_id: resource.machine_id, connection_id: resource.connection_id, active});
 	resources[resource.connection_id].on('connectionstatechange', () => {
 		if (resources[resource.connection_id].dataset.connectionState === 0)
 			delete resources[resource.connection_id];
@@ -195,7 +195,7 @@ const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
 				case 'resources':
 					return message.data.forEach(resource => addResource(module, options, storage.resources, resource));
 				case 'connected':
-					return addResource(module, options, storage.resources, message.data);
+					return addResource(module, options, storage.resources, message.data, false, true);
 				case 'disconnected':
 					if (storage.resources[message.connection_id] === undefined) {
 						console.log(`Disconnected resource ${message.connection_id} does not exist`);

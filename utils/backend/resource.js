@@ -1,10 +1,12 @@
 
-const resource = (module, {apc, resource, settings}, storage={}) => ({
+const resource = (module, {apc, resource, settings, active}, storage={}) => ({
 	hooks: [
 		['init', () => { // May not be necessary
 			const threads = settings ? settings.used : resource.capacity;
 			module.dataset.connectionState = 1;
 			storage.used = threads;
+			if (module.dataset.connection_id !== 'local' && active)
+				module.emit('establishrtc');
 		}],
 		['wsconnected', (connection_id) => {
 			if (connection_id)
