@@ -51,7 +51,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 	}).then(grouped);
 	const group = document.createElement('div');
 	group.classList.add('group');
-	group.innerHTML = `<div data-job="${id}"></div>`;
+	//group.innerHTML = `<div data-job="${id}"></div>`;
 	container.appendChild(group);
 	//const {module: plot_container} = await addModule(group, 'plot', {job: {id}});
 	const step = Object.keys(param_ranges).reduce((a,k) => Object.assign(a, {[k]: param_ranges[k].type === 'select' ? 1 : (param_ranges[k].range[1] - param_ranges[k].range[0] === 0 ? 1 : (param_ranges[k].range[1] - param_ranges[k].range[0])) / 2**param_ranges[k].range[2]}), {});
@@ -88,6 +88,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 					}, params: user_params}}));
 					plot_module.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: line}}));
 				}
+				group.querySelectorAll('.plot').forEach(plot => plot.dispatchEvent(new Event('update')));
 			});
 			break;
 		}
@@ -118,6 +119,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 					plot_module.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: squares}}));
 					break;
 				}
+				group.querySelectorAll('.plot').forEach(plot => plot.dispatchEvent(new Event('update')));
 			});
 			break;
 		}
@@ -142,19 +144,22 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 			const keys = Object.keys(values.reduce((a, v) => Object.keys(v).reduce((_a, k) => Object.assign(_a, {[k]: 1}), a), {}));
 			const output_values = entry.result_params[0].values.reduce((a,v) => Object.assign(a, {[v.name]: v.value}), {});
 			const sorted_keys = keys.sort((a,b) => output_values[a] - output_values[b]);
-			const lines = values.map((value, i) => keys.map(_i => [axes.z[i], value[_i] ? value[_i] : 0]));
-			const {module: plot_module} = await addModule(group, 'plot');
-			plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
-				name: plot_name,
-				type: 'line_plot_x',
-				xbounds: param_ranges.z.range.slice(0, 2),
-				ybounds: [0, 1], // This limits this type of plot to proportions of outcomes
-				draw: 'svg',
-				param_ranges,
-				labels: {title, x: param_ranges.x.label, y: 'Proportion'},
-				outputs: entry.result_params
-			}, params: user_params}}));
-			plot_module.querySelector(`[data-name="${plot_name}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: lines}}));
+			const lines = keys.map(_i => values.map((value, i) => [[axes.z[i], value[_i] ? value[_i] : 0]]));
+			for (const i in lines) {
+				const {module: plot_module} = await addModule(group, 'plot');
+				plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
+					name: `${plot_name}_${keys[i]}`,
+					type: 'line_plot_x',
+					xbounds: param_ranges.z.range.slice(0, 2),
+					ybounds: [0, 1], // This limits this type of plot to proportions of outcomes
+					draw: 'svg',
+					param_ranges,
+					labels: {title: `${title}, ${keys[i]}`, x: param_ranges.z.label, y: 'Proportion'},
+					outputs: entry.result_params
+				}, params: user_params}}));
+				plot_module.querySelector(`[data-name="${plot_name}_${keys[i]}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: lines[i]}}));
+			}
+			group.querySelectorAll('.plot').forEach(plot => plot.dispatchEvent(new Event('update')));
 			break;
 		}
 		case 4: {
