@@ -3,7 +3,7 @@ const resource = (module, {apc, resource, settings, active}, storage={}) => ({
 	hooks: [
 		['init', () => { // May not be necessary
 			const threads = settings ? settings.used : resource.capacity;
-			module.dataset.connectionState = 1;
+			module.dataset.connectionState = module.dataset.connection_id === 'local' ? 3 : 1;
 			storage.used = threads;
 			if (module.dataset.connection_id !== 'local' && active)
 				module.emit('establishrtc');

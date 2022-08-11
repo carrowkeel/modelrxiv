@@ -81,7 +81,7 @@ const spawnWorker = (apc, options, file_cache, workers, i, request, stream) => n
 					resolve(message.data);
 					break;
 				default:
-					console.log(message);
+					console.log('Unrecognized message received from stdout', message);
 			}
 		}
 	});

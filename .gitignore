@@ -2,3 +2,4 @@ node_modules
 fonts/
 lambdas/
 .keys
+utils/backend/script_*
