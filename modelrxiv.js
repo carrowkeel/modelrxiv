@@ -274,10 +274,11 @@ const navigate = async (env, url, back=false, reload=false) => {
 	const query = queryFromPath();
 	const pagename = window.location.pathname.substring(1);
 	const main_elem = document.querySelector('.main');
+	const static_pages = {login: 'Login', register: 'Register', privacy: 'Privacy', terms: 'Terms', contribute: 'Contribute'}; // Remove using cloudfront origin function or similar solution
 	switch(true) {
-		case env.static_pages[pagename] !== undefined:
+		case static_pages[pagename] !== undefined:
 			fetch(`/pages/${pagename}`).then(res => res.text()).then(html => {
-				document.title = `${env.static_pages[pagename]} | modelRxiv`;
+				document.title = `${static_pages[pagename]} | modelRxiv`;
 				main_elem.innerHTML = `<div class="page">${html}</div>`;
 			});
 			break;
@@ -349,32 +350,10 @@ const getCredentials = (type) => { // Add same or combined for setting credentia
 	}
 };
 
-const initServiceWorker = (uri) => new Promise((resolve, reject) => {
-	if ('serviceWorker' in navigator) {
-		return navigator.serviceWorker.register(uri, {scope: '/'}).then(reg => {
-			if (!reg.waiting && !reg.active) {
-				reg.addEventListener('updatefound', () => {
-					reg.installing.addEventListener('statechange', e => {
-						if (e.target.state === "activated") {
-							resolve();
-						}
-					});
-				});
-			} else
-				resolve();
-		}).catch(e => {
-			console.log('Failed to register sw.js: ' + e);
-			reject();
-		});
-	} else
-		return reject();
-});
 
-
-const init = async () => {
-	const env = {static_pages: {login: 'Login', register: 'Register', privacy: 'Privacy', terms: 'Terms', contribute: 'Contribute'}, db: staticDB({uri: 'https://modelrxiv.org'}), processes: {}, timeouts: {}};
+export const modelrxiv = async () => {
+	const env = {db: staticDB({uri: 'https://modelrxiv.org'}), processes: {}, timeouts: {}};
 	addHooks(window, hooks(env));
-	await initServiceWorker('/sw.js');
 	await auth(env);
 	addModule(document.querySelector('.apocentric'), 'apc', {options: {getCredentials, worker_script: '/worker.js', url: 'wss://apc.modelrxiv.org', threads: navigator.hardwareConcurrency, frameworks: ['js', 'py']}}, true);
 	window.addEventListener('popstate', e => {
@@ -383,9 +362,3 @@ const init = async () => {
 	});
 	navigate(env, undefined, false, true);
 };
-
-window.addEventListener('load', () => {
-	if (window.location.origin.match('www.modelrxiv.org'))
-		return window.location.href = 'https://modelrxiv.org';
-	init();
-});
