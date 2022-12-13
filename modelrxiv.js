@@ -1,7 +1,5 @@
 'use strict';
 
-const numericize = v => Array.isArray(v) ? v.map(numericize) : typeof v === 'object' ? Object.keys(v).reduce((a,_v)=>Object.assign(a, {[_v]: numericize(v[_v])}), {}) : (v !== '' && v !== null && !isNaN(v) ? +(v) : v);
-
 const queryFromPath = (defaults = {}) => numericize(window.location.pathname.substring(1).split('/').reduce((a,v,i,arr)=>i%2===0&&arr[i+1]!==undefined?Object.assign(a, {[v]: arr[i+1]}):a, defaults));
 
 const staticDB = options => ({
@@ -43,34 +41,6 @@ const addHooks = (elem, hooks) => {
 			}
 		}, true);
 	}
-};
-
-const readForm = (form, defaults = {}) => {
-	if (!form)
-		return defaults;
-	const args = {};
-	Array.from(form.querySelectorAll('[name]:not(.range)')).filter(item => item.closest('.form, .entry') === form).forEach(item => {
-		const name = item.getAttribute('name');
-		if (item.getAttribute('type') === 'checkbox')
-			return item.checked ? Object.assign(args, {[name]: args[name] ? args[name].concat(item.value) : [item.value]}) : 0;
-		switch(item.dataset.type) {
-			case 'json':
-				Object.assign(args, {[name]: JSON.parse(item.value)});
-				break;
-			case 'vector':
-				Object.assign(args, {[name]: item.value.split(',').map(v => +(v))});
-				break;
-			default:
-				Object.assign(args, {[name]: item.value});
-		}
-	});
-	Array.from(form.querySelectorAll('[data-entry]')).filter(item => item.parentElement.closest('.form, .entry') === form).forEach(entry => {
-		const name = entry.dataset.entry;
-		const data = readForm(entry);
-		if (data.name)
-			Object.assign(args, {[name]: args[name] ? args[name].concat(data) : [data]});
-	});
-	return Object.assign(defaults, args);
 };
 
 const filterModels = (models, query) => {
