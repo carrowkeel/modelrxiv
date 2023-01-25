@@ -27,21 +27,23 @@ const draw = (container, data, offset=0, flush=false) => { // TODO: move preview
 	container.querySelectorAll(`[data-plot][data-name]`).forEach((plot,i) => data[0][plot.dataset.name] !== undefined ? plot.dispatchEvent(new CustomEvent('update', {detail: {data: data.map(step => step[plot.dataset.name]), offset, flush}})) : 0);
 };
 
-const pythonModuleWrapper = async (module, reload=false) => ({
+const pythonModuleWrapper = async (elem, module, reload=false) => ({
 	module: await fetch(module.module_url, {cache: reload ? 'no-cache' : 'default'}).then(res => res.text()),
 	pyodide: await (async () => {
 		try {
+			elem.dispatchEvent(new Event('loading'));
 			if (typeof loadPyodide !== 'function')
 				await loadScript('/pyodide/pyodide.js');
 			const pyodide = await loadPyodide({indexURL: 'https://modelrxiv.org/pyodide/'});
 			await pyodide.loadPackage('numpy');
-			await pyodide.loadPackage('matplotlib');
 			if (module.modules) {
 				for (const module_name of module.modules.split(','))
 					await pyodide.loadPackage(module_name);
 			}
+			elem.dispatchEvent(new Event('loaded'));
 			return pyodide;
 		} catch (e) {
+			elem.dispatchEvent(new Event('loaded'));
 			return pyodide;
 			// Ignore "already loaded" error
 		}
@@ -207,7 +209,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 		['[data-module="model"]', 'run_browser', async e => {
 			const step_interval = localStorage.getItem('mdx_step_interval') || 10;
 			if (storage.step_module === undefined || e.detail?.reload) {
-				storage.step_module = entry.framework === 'js' ? await import(`${entry.module_url}${e.detail?.reload ? `?${new Date().getTime()}` : ''}`) : (entry.framework === 'py' ? await pythonModuleWrapper(entry, e.detail?.reload) : false);
+				storage.step_module = entry.framework === 'js' ? await import(`${entry.module_url}${e.detail?.reload ? `?${new Date().getTime()}` : ''}`) : (entry.framework === 'py' ? await pythonModuleWrapper(elem, entry, e.detail?.reload) : false);
 			}
 			if (!storage.loop || e.detail?.reset) {
 				//e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false}}));
@@ -251,6 +253,18 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			e.target.dataset.state = 'stopped';
 			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'p');
 			delete storage.loop;
+		}],
+		['[data-module="model"]', 'loading', e => {
+			const plots = e.target.querySelector('.plots');
+			plots.classList.add('loading');
+			const div = document.createElement('div');
+			div.classList.add('overlay');
+			div.innerHTML = 'Loading libraries...';
+			plots.appendChild(div);
+		}],
+		['[data-module="model"]', 'loaded', e => {
+			e.target.querySelector('.plots').classList.remove('loading');
+			e.target.querySelectorAll('.plots .overlay').forEach(item => item.remove());
 		}],
 		['a[data-saved]', 'click', e => {
 			const id = e.target.dataset.saved;
