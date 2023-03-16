@@ -47,7 +47,6 @@ output = step(params, _step, ${t})
 		return result instanceof Map ? Object.fromEntries(result) : result;
 	},
 	run: function (params) {
-		console.log(params);
 		const code = `${this.module}
 output = run(params)
 `;
