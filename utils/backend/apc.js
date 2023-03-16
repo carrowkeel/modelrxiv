@@ -155,15 +155,14 @@ const processRequest = (options, queue, request, request_id, user) => new Promis
 const addResource = (apc, options, resources, resource, initial=false, active=false) => {
 	if (!initial && (resource.machine_id === options.id))
 		return;
-	const current = Object.keys(resources).filter(connection_id => resources[connection_id].dataset.machine_id === resource.machine_id);
-	if (current.length > 0)
-		return current.forEach(connection_id => resources[connection_id].emit('wsconnected', resource.connection_id));
-	resources[resource.connection_id] = require('./add_module').addModule('resource', {apc, resource, frameworks: resource.frameworks, machine_id: resource.machine_id, connection_id: resource.connection_id, active});
-	resources[resource.connection_id].on('connectionstatechange', () => {
-		if (resources[resource.connection_id].dataset.connectionState === 0)
-			delete resources[resource.connection_id];
+	if (resources[resource.machine_id])
+		return resources[resource.machine_id].emit('wsconnected', resource.connection_id);
+	resources[resource.machine_id] = require('./add_module').addModule('resource', {apc, resource, frameworks: resource.frameworks, machine_id: resource.machine_id, connection_id: resource.connection_id, active});
+	resources[resource.machine_id].on('connectionstatechange', () => {
+		if (resources[resource.machine_id].dataset.connectionState === 0)
+			delete resources[resource.machine_id];
 	});
-	return resources[resource.connection_id];
+	return resources[resource.machine_id];
 };
 
 const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
@@ -196,20 +195,22 @@ const apc = (module, {options, request}, elem, storage={resources: {}}) => ({
 					return message.data.forEach(resource => addResource(module, options, storage.resources, resource));
 				case 'connected':
 					return addResource(module, options, storage.resources, message.data, false, true);
-				case 'disconnected':
-					if (storage.resources[message.connection_id] === undefined) {
+				case 'disconnected': {
+					const local_resource = Object.values(storage.resources).find(resource => resource.dataset.connection_id === message.connection_id);
+					if (local_resource === undefined) {
 						console.log(`Disconnected resource ${message.connection_id} does not exist`);
-						console.log(storage.resources);
 						return;
 					}
-					return storage.resources[message.connection_id].emit('wsdisconnected');
-				default:
-					if (storage.resources[message.user] === undefined) {
+					return local_resource.emit('wsdisconnected');
+				}
+				default: {
+					const local_resource = Object.values(storage.resources).find(resource => resource.dataset.connection_id === message.user);
+					if (local_resource === undefined) {
 						console.log(`Resource ${message.user} does not exist`);
 						console.log(message);
-						console.log(storage.resources);
 					}
-					return storage.resources[message.user].emit('message', message);
+					return local_resource.emit('message', message);
+				}
 			}
 		}]
 	]
