@@ -9,7 +9,7 @@ const mixer = (c1, w1, c2, w2) => {
 	return !c2 ? c1 : c1.map((c,i) => c*w1 + c2[i]*w2);
 };
 
-const grouped = results => {
+const combineStatResults = results => {
 	return results.length === 0 ? {} : Object.keys(results[0]).reduce((a, stat) => {
 		return Object.assign(a, {[stat]: results.map(result => result[stat])});
 	}, {});
@@ -48,11 +48,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 	}).catch(e => {
 		console.log(e);
 		return Promise.reject('Failed to run grid');
-	}).then(grouped);
-	const group = document.createElement('div');
-	group.classList.add('group');
-	//group.innerHTML = `<div data-job="${id}"></div>`;
-	container.appendChild(group);
+	}).then(combineStatResults);
 	//const {module: plot_container} = await addModule(group, 'plot', {job: {id}});
 	const step = Object.keys(param_ranges).reduce((a,k) => Object.assign(a, {[k]: param_ranges[k].type === 'select' ? 1 : (param_ranges[k].range[1] - param_ranges[k].range[0] === 0 ? 1 : (param_ranges[k].range[1] - param_ranges[k].range[0])) / 2**param_ranges[k].range[2]}), {});
 	const axes = ['x', 'y', 'z', 's'].reduce((axes, axis) => {
@@ -71,10 +67,14 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 			dist(user_params, axes.x.map(x => {
 				return {[param_ranges.x.name]: x};
 			})).then(async results => {
+				console.log(results);
 				for (const stat in results) {
 					const output = Object.assign({}, entry.result_params.find(param => param.name === stat));
 					const output_values = output.type === 'disc' ? Object.fromEntries(output.values.map(output => [output.name, output])) : {};
 					const line = results[stat].map((value,i) => [[param_ranges.x.type === 'select' ? i : axes.x[i], output.type === 'disc' ? +(output_values[value].value) : value]]);
+					const group = document.createElement('div');
+					group.classList.add('group');
+					container.appendChild(group);
 					const {module: plot_module} = await addModule(group, 'plot');
 					plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
 						name: `${plot_name}_${stat}`,
@@ -83,12 +83,11 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 						ybounds: output.range ? output.range.split(',').map(v => +(v)) : [0, 1],
 						draw: 'svg',
 						param_ranges,
-						labels: {title: `${stat}`, x: param_ranges.x.label, y: 'Value'},
+						labels: {title: output.label, x: param_ranges.x.label, y: output.units || 'Value'},
 						outputs: entry.result_params
 					}, params: user_params}}));
 					plot_module.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: line}}));
 				}
-				group.querySelectorAll('.plot').forEach(plot => plot.dispatchEvent(new Event('update')));
 			});
 			break;
 		}
@@ -104,6 +103,9 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 					if (output.values && output.values instanceof Array)
 						output.values = Object.fromEntries(output.values.map(output => [output.name, output])); // TODO: Find a better solution, maybe do this when setting up entry. This previously caused an issue by mutated values for the submit form
 					const squares = results[stat].map((result,i) => dataPoint(output, param_ranges, result, grid[i].x, grid[i].y, [step.x, step.y]));
+					const group = document.createElement('div');
+					group.classList.add('group');
+					container.appendChild(group);
 					const {module: plot_module} = await addModule(group, 'plot');
 					plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
 						name: `${plot_name}_${stat}`,
@@ -119,7 +121,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 					plot_module.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: squares}}));
 					break;
 				}
-				group.querySelectorAll('.plot').forEach(plot => plot.dispatchEvent(new Event('update')));
+				//group.querySelectorAll('.plot').forEach(plot => plot.dispatchEvent(new Event('update')));
 			});
 			break;
 		}
@@ -145,6 +147,9 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 			const output_values = entry.result_params[0].values.reduce((a,v) => Object.assign(a, {[v.name]: v.value}), {});
 			const sorted_keys = keys.sort((a,b) => output_values[a] - output_values[b]);
 			const lines = keys.map(_i => values.map((value, i) => [[axes.z[i], value[_i] ? value[_i] : 0]]));
+			const group = document.createElement('div');
+			group.classList.add('group');
+			container.appendChild(group);
 			for (const i in lines) {
 				const {module: plot_module} = await addModule(group, 'plot');
 				plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
@@ -184,6 +189,9 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 				return filtered_indexes.map((_,i) => mean(results[stat].slice(filtered_indexes[i], filtered_indexes[i+1])));
 			});
 			const line = values.map((value,i) => [[axes.z[i], value]]);
+			const group = document.createElement('div');
+			group.classList.add('group');
+			container.appendChild(group);
 			const {module: plot_module} = await addModule(group, 'plot');
 			plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
 				name: `${plot_name}_${stat}`,

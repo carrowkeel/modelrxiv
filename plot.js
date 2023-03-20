@@ -395,7 +395,7 @@ const canvas_draw = (canvas, ctx, bounds=[[0, 1], [0, 1]], dims=[canvas.dataset.
 export const plot = (env, {job}, elem, storage={}) => ({
 	render: async () => {
 		elem.classList.add('plot');
-		elem.innerHTML = `<div class="header"><div class="settings-menu menu"><a data-action="close">Hide</a><a data-action="split">Split</a><a data-action="save">Save SVG</a><a data-action="export">Export</a></div><a data-icon="f" data-action="settings-menu" class="settings fright"></a><div class="figure-selector"></div></div><div class="legend"></div><div class="draw_area">${job ? `<div class="overlay" data-job="${job.id}"></div>` : ''}</div>`;
+		elem.innerHTML = `<div class="header"><div class="settings-menu menu"><a data-action="close">Hide</a><a data-action="split">Split</a><a data-action="save">Save SVG</a><a data-action="export">Export</a></div><a data-icon="f" data-action="settings-menu" class="settings fright"></a><div class="title"></div></div><div class="legend"></div><div class="draw_area">${job ? `<div class="overlay" data-job="${job.id}"></div>` : ''}</div>`;
 		elem.dispatchEvent(new Event('done'));
 	},
 	hooks: [
@@ -414,23 +414,23 @@ export const plot = (env, {job}, elem, storage={}) => ({
 			elem.dispatchEvent(new Event('update'));
 		}],
 		['[data-module="plot"]', 'update', e => {
-			const selector = elem.querySelector('.figure-selector');
+			const title = elem.querySelector('.title');
 			const plots = Array.from(elem.closest('.group').querySelectorAll('[data-plot]')).map(plot => Object.assign({}, plot.dataset, {labels: JSON.parse(plot.dataset.labels)}));
 			if (plots.length === 0)
 				return e.target.remove();
 			switch(true) {
 				case ['hist_2d'].includes(plots[0].plot):
 					plots.forEach(plot => {
-						if (!selector.querySelector(`[data-figure="${plot.name}"]`)) {
+						if (!title.querySelector(`[data-figure="${plot.name}"]`)) {
 							const link = document.createElement('a');
 							link.dataset.figure = plot.name;
 							link.innerHTML = formatLabel(plot.labels.title);
-							selector.appendChild(link);
+							title.appendChild(link);
 						}
 					});
 					break;
 				case ['line_plot', 'line_plot_x', 'line_repeats', 'lines'].includes(plots[0].plot):
-					selector.innerHTML = `<a>${plots.length === 1 ? formatLabel(plots[0].labels.title) : formatLabel(plots[0].labels.y)}</a>`;
+					title.innerHTML = `<a>${plots.length === 1 ? formatLabel(plots[0].labels.title) : formatLabel(plots[0].labels.y)}</a>`;
 					elem.querySelector('.legend').innerHTML = plots.length === 1 ? '' : plots.map(plot => {
 						return `<a data-line="${plot.name}">${formatLabel(plot.labels.title)}</a>`;
 					}).join('');
@@ -478,10 +478,24 @@ export const plot = (env, {job}, elem, storage={}) => ({
 				draw_elem.clear();
 			plot_types.find(plot => plot.slug === e.target.dataset.plot).draw(draw_elem, data, offset);
 		}],
+		['.header .title, .header .title a', 'dblclick', e => {
+			console.log(e);
+			// Switch to input element to allow editing
+			const title_elem = e.target.closest('.title');
+			const title = title_elem.querySelector('a').innerText;
+			title_elem.innerHTML = `<input type="text" name="title" value="${title}" placeholder="Title">`;
+			const input_elem = title_elem.querySelector('input');
+			input_elem.focus();
+			input_elem.addEventListener('keyup', e => {
+				if (e.keyCode !== 13)
+					return;
+				title_elem.innerHTML = `<a>${e.target.value}</a>`;
+			});
+		}],
 		['[data-figure]', 'click', e => {
-			const figure = e.target.dataset.figure;
-			elem.querySelector('.group').insertBefore(elem.querySelector(`[data-plot][data-name="${figure}"]`), elem.querySelector('[data-plot]:first-child'));
-			elem.querySelector('.figure-selector').insertBefore(e.target, elem.querySelector('.figure-selector>a:first-child'));
+			//const figure = e.target.dataset.figure;
+			//elem.querySelector('.group').insertBefore(elem.querySelector(`[data-plot][data-name="${figure}"]`), elem.querySelector('[data-plot]:first-child'));
+			//elem.querySelector('.figure-selector').insertBefore(e.target, elem.querySelector('.figure-selector>a:first-child'));
 		}],
 		['[data-action="split"]', 'click', e => {
 			e.target.closest('.plot').dispatchEvent(new Event('split'));

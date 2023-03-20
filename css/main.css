@@ -627,25 +627,10 @@ polygon.proportion:hover {
 .plot .header {
 	height: 29px;
 }
-.plot .figure-selector {
-	position: absolute;
-	top: 0;
-	z-index: 50;
-	background: #fafafa;
-	white-space: nowrap;
-	height: 29px;
-	/*overflow-y: hidden;*/
-}
-.plot .figure-selector:hover {
-	height: auto;
-}
-.plot .header>a, .plot .figure-selector>a {
+.plot .header .title a {
 	font-size: 14px;
 	padding: 3px 0;
 	color: #333;
-}
-.plot .figure-selector>a {
-	display: block;
 }
 .plot .settings-menu a, .plot .data-menu a {
 	display: block;
@@ -1247,11 +1232,11 @@ h2 a.tag {
 	width: 100%;
 	min-width: 100%;
 	max-width: 100%;
-	height: 250px;
+	height: 500px;
 	float: none;
-	font-size: 15px;
+	font-size: 14px;
 	font-family: monospace;
-	background: #eee;
+	background: #fff;
 	padding: 5px;
 }
 .editor .watermark {
