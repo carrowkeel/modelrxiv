@@ -142,7 +142,12 @@ const processRequest = (options, queue, request, request_id, user) => new Promis
 					const output_stream = require('fs').createWriteStream(`outputs/${request_id}.output`);
 					return Promise.all(request.collection.map(batch => {
 						return queue({framework: request.framework, sources: request.sources, fixed_params: request.fixed_params, variable_params: batch}, data => data ? output_stream.write(JSON.stringify(data)+'\n') : 0);
-					})).then(resolve);
+					})).then(results => {
+						console.log(output_stream.bytesWritten);
+						if (output_stream.bytesWritten > 10 * 1024 ** 2)
+							return resolve([{filename: `outputs/${request_id}.output`, n: results.length, bytes: output_stream.bytesWritten}]);
+						resolve(results);
+					});
 				default:
 					const {Readable} = require('stream');
 					const dynamics_stream = new Readable({objectMode: true, read(chunk){}});

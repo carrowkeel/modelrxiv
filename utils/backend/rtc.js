@@ -2,7 +2,7 @@
 const range = (start,end) => Array.from(Array(end-start)).map((v,i)=>i+start);
 
 const rtcReceiveParts = (channel, message_id, parts = [], n = 0) => new Promise((resolve, reject) => {
-	const handle_part = e => { // Remove listener when resolved
+	const handle_part = e => {
 		const message_data = JSON.parse(e.data);
 		if (message_data.message_id !== message_id)
 			return;
@@ -37,7 +37,7 @@ const rtcSend = async (channel, request, rtc_message_limit = 100 * 1024) => { //
 const handleChannelStatus = (rtc_module, channel, event, user) => { // Fix inconsistency of using "event" vs "e" in this file
 	if (event.type === 'open') {
 		rtc_module.emit('channelconnected', channel);
-	} else if (event.type === 'close') {
+	} else if (event.type === 'close' || event.type === 'closing') {
 		rtc_module.emit('channeldisconnected');
 	}
 };
@@ -47,6 +47,8 @@ const addDataChannel = (rtc_module, event, user, receiving, _channel) => {
 	channel.addEventListener('message', event => receiveMessage(rtc_module, channel, event, user, receiving));
 	channel.addEventListener('open', event => handleChannelStatus(rtc_module, channel, event, user));
 	channel.addEventListener('close', event => handleChannelStatus(rtc_module, channel, event, user));
+	channel.addEventListener('closing', event => handleChannelStatus(rtc_module, channel, event, user));
+	channel.addEventListener('error', event => handleChannelStatus(rtc_module, channel, event, user));
 	return channel;
 };
 
@@ -119,7 +121,6 @@ const processAnswer = (connection, answer) => {
 		return console.log(`Setting answer with ${connection ? connection.signalingState : 'no client'} state`, 'RTC process answer');
 	connection.setRemoteDescription(answer)
 		.catch(e => {
-			console.log(e, 'RTC process answer');
 			connection.restartIce();
 		});
 };
@@ -162,18 +163,19 @@ const rtc = (module, {resource, connection_id: ws_connection_id, rtc_data}, stor
 				storage.peer_connection = createPeerConnection(module, resource, ws_connection_id, storage.ice_queue, storage.receiving, false);
 			process(resource, ws_connection_id, storage.peer_connection, storage.ice_queue, data);
 		}],
-		['channelconnected', (channel) => { // Update connection state
+		['channelconnected', (channel) => {
 			storage.channel = channel;
 			module.dataset.status = 'connected';
-			// connected event for resource
 		}],
 		['channeldisconnected', e => {
 			module.dataset.status = 'disconnected';
 			module.emit('disconnected');
 		}],
-		['send', data => {
+		['send', async data => {
 			// Move stream handling elsewhere
 			const request = data; // Is this always request?
+			if (storage.channel.readyState !== 'open') // Possibly remove
+				await new Promise(resolve => module.emit('connect', resolve));
 			if (request.data.constructor.name === 'Readable') {
 				const stream = request.data;
 				stream.on('readable', () => {
