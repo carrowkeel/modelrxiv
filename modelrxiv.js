@@ -1,6 +1,6 @@
 'use strict';
 
-const queryFromPath = (defaults = {}) => numericize(window.location.pathname.substring(1).split('/').reduce((a,v,i,arr)=>i%2===0&&arr[i+1]!==undefined?Object.assign(a, {[v]: arr[i+1]}):a, defaults));
+const queryFromPath = (path, defaults = {}) => numericize(path.substring(1).split('/').reduce((a,v,i,arr)=>i%2===0&&arr[i+1]!==undefined?Object.assign(a, {[v]: arr[i+1]}):a, defaults));
 
 const staticDB = options => ({
 	data: {},
@@ -194,17 +194,11 @@ const hooks = env => [
 
 // TODO: restructure this function
 const navigate = async (env, url, back=false, reload=false) => {
-	if (!reload) {
-		if (back)
-			window.history.replaceState({page: url}, '', url);
-		else
-			window.history.pushState({page: url}, '', url);
-	}
 	for (const slug in env.processes) {
 		clearTimeout(env.processes[slug].timeout);
 		delete env.processes[slug];
 	}
-	const query = queryFromPath();
+	const query = queryFromPath(url || window.location.pathname);
 	const pagename = window.location.pathname.substring(1);
 	const main_elem = document.querySelector('.main');
 	const static_pages = {login: 'Login', register: 'Register', privacy: 'Privacy', terms: 'Terms', contribute: 'Contribute'}; // Remove using cloudfront origin function or similar solution
@@ -219,7 +213,7 @@ const navigate = async (env, url, back=false, reload=false) => {
 			main_elem.innerHTML = '';
 			const entry = query.edit ? await env.db.get(signedURL(`users/${getCredentials('user_id')}/.list`), ['model_id', query.edit]) : false;
 			const data = entry ? await env.db.get(signedURL(`users/${getCredentials('user_id')}/${entry.model_id}.json`), [], {private: true}) : false; // This repeats below
-			addModule(main_elem, 'submit', {entry: data, query});
+			await addModule(main_elem, 'submit', {entry: data, query});
 			break;
 		}
 		case query.model !== undefined || (query.sandbox !== undefined && getCredentials('user_id') !== false): {
@@ -230,9 +224,9 @@ const navigate = async (env, url, back=false, reload=false) => {
 				const data = await (query.sandbox ?
 					env.db.get(signedURL(`users/${getCredentials('user_id')}/${entry.model_id}.json`), [], {private: true}) :
 					env.db.get(`models/${query.model}.json`));
-				addModule(main_elem, 'model', {entry: data, query});
+				await addModule(main_elem, 'model', {entry: data, query});
 			} else
-				navigate(env, '/');
+				return navigate(env, '/');
 			break;
 		}
 		default:
@@ -242,6 +236,12 @@ const navigate = async (env, url, back=false, reload=false) => {
 			});
 			Object.entries(query).forEach(([name, value]) => main_elem.querySelectorAll(`.filters [name="${name}"]`).forEach(item => item.value = value)); // Maybe move elsewhere
 			main_elem.querySelector('.filtered-list').dispatchEvent(new Event('refresh'));
+	}
+	if (!reload) {
+		if (back)
+			window.history.replaceState({page: url}, '', url);
+		else
+			window.history.pushState({page: url}, '', url);
 	}
 };
 

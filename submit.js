@@ -40,7 +40,7 @@ const search = async (field, query) => {
 	});
 };
 
-const composeCode = (pseudocode, params) => {
+const composeCode = (pseudocode, params) => { // This is no longer used
 	const lines = pseudocode.split('\n');
 	const output_variables = [];
 	const definitions = lines.map(line => {
@@ -130,6 +130,22 @@ const populateForm = (form, data) => {
 	});
 };
 
+const pollS3 = async (url, retry_limit=20, increment=5) => {
+	let retries = 0;
+	while (++retries <= retry_limit) {
+		await new Promise(resolve => setTimeout(resolve, increment * retries * 1000));
+		try {
+			const response = await fetch(url, {cache: 'no-cache', headers: {'Cache-Control': 'no-cache'}});
+			if (!response.ok)
+				throw 'Request failed';
+			return response;
+		} catch (e) {
+			// Depending on fetch error, maybe stop polling
+		}
+	}
+	throw 'Failed to load S3 object';
+};
+
 const hooks = (env, entry, query, elem) => [
 	['[data-module="submit"]', 'update', e => {
 		const data = readForm(elem.querySelector('.submission-form'));
@@ -154,6 +170,13 @@ const hooks = (env, entry, query, elem) => [
 				//localStorage.setItem('mdx_submit_form', '');
 			}
 		}
+	}],
+	['.editor [data-tab]', 'click', e => {
+		const editor = e.target.closest('.editor');
+		editor.querySelectorAll('[data-tab]').forEach(elem => elem.classList.remove('selected'));
+		e.target.classList.add('selected');
+		editor.querySelectorAll('[data-tab-content]').forEach(elem => elem.classList.remove('show'));
+		editor.querySelector(`[data-tab-content="${e.target.dataset.tab}"]`).classList.add('show');
 	}],
 	['[data-action="publish"]', 'click', async e => {
 		const form = e.target.closest('.form');
@@ -220,6 +243,12 @@ const hooks = (env, entry, query, elem) => [
 		form.querySelector('.editor.code').classList.remove('hide');
 		form.querySelector('.editor.builder').classList.add('hide');
 	}],
+	['[data-tab] [data-action="close"]', 'click', e => {
+		const tab = e.target.closest('[data-tab]');
+		const tab_name = tab.dataset.tab;
+		tab.remove();
+		elem.querySelector(`[data-tab-content="${tab_name}"]`).remove(); // Don't use "elem"
+	}],
 	['.editor textarea', 'keydown', e => {
 		if (e.keyCode !== 9)
 			return;
@@ -244,10 +273,37 @@ const hooks = (env, entry, query, elem) => [
 		const code = composeCode(pseudocode, {target_steps: 100});
 		form.querySelector('[name="code"]').value = code;
 	}],
+	['[data-action="import-code"]', 'click', async e => {
+		const form = e.target.closest('.form');
+		const prompt = form.querySelector('.code.show [name="code"]').value;
+		const request_id = Math.round(Math.random() * 1e6);
+		const initial_request = await fetch(`https://d.modelrxiv.org/import`, {method: 'post', headers: {Authorization: `Basic ${getCredentials('token')}`, 'Content-Type': 'application/json'}, body: JSON.stringify({code: prompt, request_id})}).then(res => res.json()).catch(e => ({text: 'Error retrieving response', code: ':('}));
+		// Polling S3 for resource
+		try {
+			const result = await pollS3(signedURL(`/users/${getCredentials('user_id')}/resources/${request_id}`), 10, 6).then(res => res.text());
+			const tab_content = document.createElement('div');
+			tab_content.classList.add('code');
+			tab_content.dataset.tabContent = `tab_${request_id}`;
+			tab_content.dataset.status = 'edited';
+			//const code = typeof result === 'string' ? result.replace(/^.*?```(.*?)```.*$/s, '$1') : result.code;
+			//const text = typeof result === 'string' ? result.replace(/```.*?```/sg, '') : result.text;
+			tab_content.innerHTML = `<textarea name="code">${result}</textarea><div class="comment"></div>`; // ${result.text}
+			const tab = document.createElement('div');
+			tab.dataset.tab = `tab_${request_id}`;
+			tab.dataset.status = `edited`;
+			tab.innerHTML = 'GPT Result <a data-icon="x" data-action="close"></a>';
+			form.querySelector('.editor').appendChild(tab_content);
+			form.querySelector('.editor .tabs').appendChild(tab);
+			form.querySelector(`.editor .tabs [data-tab="tab_${request_id}"]`).dispatchEvent(new Event('click'));
+		} catch (e) {
+			console.log(e);
+		}
+	}],
 	['[data-action="test-code"]', 'click', async e => { // TODO: move to function
 		const form = e.target.closest('.form');
 		const framework = form.querySelector('[name="framework"]').value;
-		const code = form.querySelector('[name="code"]').value;
+		const tab = form.querySelector('.code.show').dataset.tabContent;
+		const code = form.querySelector('.code.show [name="code"]').value;
 		if (framework === '' || code === '')
 			return;
 		const key = await fetch(`https://d.modelrxiv.org/submit`, {method: 'POST', headers: {Authorization: `Basic ${getCredentials('token')}`}, body: JSON.stringify({action: 'sandbox', framework, code})}).then(res => res.json()).then(json => json.key);
@@ -265,13 +321,17 @@ const hooks = (env, entry, query, elem) => [
 			};
 			document.querySelector('.apocentric').dispatchEvent(new CustomEvent('distribute', {detail: request}));
 		}).then(([result]) => {
-			const error_box = elem.querySelector('.editor.code .error');
+			const comment_box = elem.querySelector('.editor .code.show .comment');
+			const error_box = document.createElement('div');
+			comment_box.appendChild(error_box);
 			error_box.classList.add('show');
-			error_box.classList.remove('green');
-			if (result.error)
+			if (result.error) {
+				form.querySelectorAll(`.editor [data-tab="${tab}"], .editor [data-tab-content="${tab}"]`).forEach(elem => elem.dataset.status = 'test-fail');
 				return error_box.innerHTML = result.error;
+			}
 			error_box.innerHTML = 'Model code ran successfully';
 			error_box.classList.add('green');
+			form.querySelectorAll(`.editor [data-tab="${tab}"], .editor [data-tab-content="${tab}"]`).forEach(elem => elem.dataset.status = 'test-success');
 			for (const entry_type in result)
 				entries(result[entry_type]).forEach(([name, value]) => cloneEntry(elem, entry_type, {name, label: name, units: name, default_value: value, type: isNaN(value) ? 'disc' : 'cont'})); // .filter(item => item.closest('.form, .entry') === form)
 			Array.from(elem.querySelectorAll('[data-entry]')).forEach(item => {
@@ -280,6 +340,7 @@ const hooks = (env, entry, query, elem) => [
 					item.classList.add('error');
 					const message = document.createElement('div');
 					message.innerHTML = `Parameter '${name}' not found in model`;
+					form.querySelectorAll(`.editor [data-tab="${tab}"], .editor [data-tab-content="${tab}"]`).forEach(elem => elem.dataset.status = 'test-fail');
 					error_box.classList.remove('green');
 					error_box.appendChild(message);
 				}

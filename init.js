@@ -104,7 +104,11 @@ const initServiceWorker = (uri) => new Promise((resolve, reject) => {
 
 
 const init = async () => {
-	await initServiceWorker('/sw.js');
+	try {
+		await initServiceWorker('/sw.js');
+	} catch (e) {
+		console.log('Failed to load Service Worker');
+	}
 	import('./modelrxiv.js').then(module => module.modelrxiv());
 };
 

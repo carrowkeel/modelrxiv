@@ -1,7 +1,7 @@
 
 const formatLabel = text => {
-	const label = text.replace(/(^|[^a-zA-Z])([a-zA-Z])(_|\^)(\{([^\{]+)\}|[a-zA-Z0-9])/, (_, pre, name, type, sub, sub_curly) => `${pre}${name}<${type === '_' ? 'sub' : 'sup'}>${sub_curly || sub}</${type === '_' ? 'sub' : 'sup'}>`);
-	return text.match(/^[a-zA-Z](_|$)/) ? `<i>${label}</i>` : label;
+	const label = text.replace(/(^|[^a-zA-Z])([^\s\p{P}])(_|\^)(\{([^\{]+)\}|[^\s\p{P}])/u, (_, pre, name, type, sub, sub_curly) => `${pre}${name}<${type === '_' ? 'sub' : 'sup'}>${sub_curly || sub}</${type === '_' ? 'sub' : 'sup'}>`);
+	return text.match(/^[^\s\p{P}](_|$)/u) ? `<i>${label}</i>` : label;
 };
 
 const fieldsFromForm = (input_params, query) => {
@@ -85,7 +85,7 @@ const stepWrapper = (container, step_module, params, _step, storage=[]) => {
 		if (!step)
 			return complete(params, storage);
 		storage.push(step);
-		draw(plots_container, storage, 0, true); // storage.slice(storage.length - 2), storage.length - 2);
+		draw(plots_container, storage, 0, true);
 		return step;
 	}
 };
@@ -136,8 +136,8 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 				break;
 			default:
 				const option_fields = fieldsFromForm(input_params, query);
-				elem.innerHTML = `<div class="fright"><div data-framework="${entry.framework}">.${entry.framework}</div></div><h2>${entry.title}</h2><div class="authors">${entry.authors || ''}. ${entry.doi ? `<a href="https://doi.org/${entry.doi}" target="_blank">doi:${entry.doi}</a>` : ''}</div><div class="description shorten">${entry.description || ''}</div><div class="tabs"><div class="result-tab menu"></div><div class="parameters-menu menu show multiple-tabs"><div class="tabs"><a data-tab="parameters" class="selected">Parameters</a><a data-tab="presets">Presets</a></div><div data-tab-content="parameters" class="form show">${option_fields}<div class="clear space"><a class="button" data-action="grid" title="Meta analysis using selected parameters">Grid</a><div class="clear"></div></div></div><div data-tab-content="presets">${presetHTML}</div><div data-tab-content="saved"></div></div><a class="fright" data-action="parameters-menu" title="Edit the model parameters" data-icon="f">Parameters</a><a class="fright" data-action="restart" title="Restart the model" data-icon="r">Restart</a><a class="fright" data-action="start" title="Start/Pause the model" data-icon="p">Run</a><a class="${!query.code && !query.pseudocode ? 'selected' : ''}" href="${uri}" title="Open the model analysis page">Model</a>${entry.private ? `<a href="/edit/${entry.model_id}" title="Edit the model code and parameters">Edit</a><a title="Make the model publicly available (subject to review)" data-action="publish">Publish</a>` : '<a title="Create a local copy of the model" data-action="copy">Copy</a>'}<a class="${query.code ? 'selected' : ''}" href="${uri}/code/latest" title="View the model source code">Code</a>${entry.pseudocode ? `<a class="${query.pseudocode ? 'selected' : ''}" href="${uri}/pseudocode/latest" title="View the model equations">Equations</a>` : ''}</div>${query.code || query.pseudocode ? '<div class="editor line-numbers"><div class="watermark">Powered by Prism.js</div><pre><code class="language-javascript"></code></pre></div>' : '<div class="plots" data-empty="Initiate model to load results"></div>'}`;
-				elem.dispatchEvent(new CustomEvent('init', {detail: {group: true}}));
+				elem.innerHTML = `<div class="fright"><div data-framework="${entry.framework}">.${entry.framework}</div></div><h2>${entry.title}</h2><div class="authors">${entry.authors || ''}. ${entry.doi ? `<a href="https://doi.org/${entry.doi}" target="_blank">doi:${entry.doi}</a>` : ''}</div><div class="description shorten">${entry.description || ''}</div><div class="tabs"><div class="result-tab menu"></div><div class="parameters-menu menu show"><div class="tabs"><a data-tab="parameters" class="${entry.private || presetHTML === '' ? 'selected' : ''}">Parameters</a><a data-tab="presets" class="${entry.private || presetHTML === '' ? '' : 'selected'}">Presets</a></div><div data-tab-content="presets" class="${entry.private || presetHTML === '' ? '' : 'show'}">${presetHTML}</div><div data-tab-content="parameters" class="form ${entry.private || presetHTML === '' ? 'show' : ''}">${option_fields}<div class="clear space"><a class="button" data-action="grid" title="Meta analysis using selected parameters">Grid</a><div class="clear"></div></div></div><div data-tab-content="saved"></div></div><a class="fright" data-action="parameters-menu" title="Edit the model parameters" data-icon="f">Parameters</a><a class="fright" data-action="restart" title="Restart the model" data-icon="r">Restart</a><a class="fright" data-action="start" title="Start/Pause the model" data-icon="p">Run</a><a class="${!query.code ? 'selected' : ''}" href="${uri}" title="Open the model analysis page">Model</a>${getCredentials().user_id ? (entry.private ? `<a href="/edit/${entry.model_id}" title="Edit the model code and parameters">Edit</a><a title="Make the model publicly available (subject to review)" data-action="publish">Publish</a>` : '<a title="Create a local copy of the model" data-action="copy">Copy</a>') : ''}<a class="${query.code ? 'selected' : ''}" href="${uri}/code/latest" title="View the model source code">Code</a></div>${query.code ? '<div class="editor"><textarea disabled="disabled" name="code_display"></textarea></div>' : '<div class="plots" data-empty="Initiate model to load results"></div>'}`;
+				await new Promise(resolve => elem.dispatchEvent(new CustomEvent('init', {detail: {group: true, resolve}})));
 				break;
 		}
 		elem.dispatchEvent(new Event('done'));
@@ -147,15 +147,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			switch(true) { // Move elsewhere
 				case query.code !== undefined:
 					const code = await fetch(entry.module_url, {cache: 'reload'}).then(res => res.text());
-					elem.querySelector('.editor code').innerHTML = code;
-					await loadScript('/ext/prism.js');
-					Prism.highlightElement(elem.querySelector('.editor code'));
-					break;
-				case query.pseudocode !== undefined:
-					elem.querySelector('.editor code').setAttribute('class', 'language-python');
-					elem.querySelector('.editor code').innerHTML = entry.pseudocode;
-					await loadScript('/ext/prism.js');
-					Prism.highlightElement(elem.querySelector('.editor code'));
+					elem.querySelector('.editor [name="code_display"]').value = code;
 					break;
 				case elem.querySelector('.plots') !== null:
 					const {plotsFromOutput, groupPlots} = await import('./plot.js');
@@ -176,6 +168,35 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			if (e.detail?.resolve)
 				e.detail.resolve();
 		}],
+
+/*
+const stepWrapper = (container, step_module, params, _step, storage=[]) => {
+	const t = storage.length;
+	const plots_container = container.querySelector('.plots');
+	const complete = (params, storage) => { // TODO: decide how result is handled in dynamics mode
+		const result = step_module.result ? step_module.result(params, storage) : {};
+		container.querySelector('.result-tab').innerHTML = '<h4>Result</h4><pre>'+Object.entries(result).map(([param, value]) => `${param}: ${value}\n`).join('')+'</pre>';
+		//container.querySelector('.result-tab').classList.add('show');
+		setTimeout(() => {
+			container.querySelector('.result-tab').classList.remove('show');
+		}, 5000);
+		draw(plots_container, storage, 0, true);
+		return false;
+	};
+	if (t - 1 === parseInt(params.target_steps)) {
+		complete(params, storage);
+		return false;
+	} else {
+		const step = step_module.step(params, _step, t);
+		if (!step)
+			return complete(params, storage);
+		storage.push(step);
+		draw(plots_container, storage, 0, true);
+		return step;
+	}
+};
+*/
+
 		['[data-module="model"]', 'run', async e => {
 			const plots_container = elem.querySelector('.plots');
 			const step_interval = localStorage.getItem('mdx_step_interval') || 10;
@@ -195,8 +216,8 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 					if (step.done)
 						return e.target.dispatchEvent(new Event('stopped'));
 					step_storage.push(step.value);
-					if (step_storage.length > 100)
-						step_storage.shift();
+					//if (step_storage.length > 101) // This should be managed by the plot itself, receiving another timepoint beyond the x-axis will result in changing the axis or a sliding window
+					//	step_storage.shift();
 					draw(plots_container, step_storage, 0, true);
 					storage.timeout = setTimeout(storage.loop, step_interval);
 				};
@@ -357,7 +378,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			if (selected.length > 0)
 				runGrid(entry, elem.querySelector('.parameters-menu .form'), query, elem.querySelector('.plots'), title);
 			else
-				elem.dispatchEvent(new Event('run'));
+				elem.dispatchEvent(new Event(localStorage.getItem('mdx_state') === 'test' ? 'run' : 'run_browser'));
 		}],
 		['.option label', 'click', e => {
 			const option = e.target.closest('.option');
@@ -365,7 +386,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 				option.querySelector('label input').value = '';
 				return option.classList.remove('selected');
 			}
-			const letters = ['x', 'y', 'z', 's']; // TODO: replace this solution
+			const letters = ['x', 'y']; // TODO: replace this solution
 			const selected = Array.from(e.target.closest('.form').querySelectorAll('.option.selected'));
 			const current_dims = selected.map(elem => elem.querySelector('label input').value);
 			const remaining_dims = letters.filter(v => !current_dims.includes(v));

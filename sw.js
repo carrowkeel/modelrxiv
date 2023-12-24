@@ -3,15 +3,9 @@
 const cache_id = 'mdx_cache';
 const mdx_origin = 'https://modelrxiv.org';
 
-const getEnv = () => {
-	return caches.open(cache_id).then(async cache => {
-		return cache.match(new Request('/env')).then(response => response ? response.text() : 'prod');
-	});
-};
-
 const cacheResponse = (request, response) => {
 	return caches.open(cache_id).then(async cache => {
-		if (request.method !== 'POST' && request.method !== 'PUT' && ![206, 416].includes(response.status))
+		if (request.method !== 'POST' && request.method !== 'PUT' && ![206, 403, 416].includes(response.status))
 			await cache.put(request, response.clone());
 		return response;
 	});
@@ -19,16 +13,11 @@ const cacheResponse = (request, response) => {
 
 const routeRequest = async (request) => {
 	const url = new URL(request.url);
-	if (url.origin === mdx_origin && url.pathname.startsWith('/images/')) {
+	if (url.origin === mdx_origin && url.pathname !== '/' && (url.pathname.startsWith('/pyodide/') || !url.pathname.endsWith('.js')) && !url.pathname.endsWith('.py') && !url.pathname.endsWith('.css') && !url.pathname.endsWith('.html') && !url.pathname.endsWith('.list') && (!url.pathname.startsWith('/users/') || !url.pathname.endsWith('.json')) && request.cache != 'no-cache') {
 		const response = await fetch(request);
 		return cacheResponse(request, response);
-	} else if (url.origin === mdx_origin) {
-		const env_state = await getEnv();
-		if (env_state === 'test')
-			return fetch(new Request(`https://beta.modelrxiv.org${url.pathname}`));
-		return fetch(request);
-	} else
-		return fetch(request);
+	}
+	return fetch(request);
 };
 
 self.addEventListener('activate', event => {

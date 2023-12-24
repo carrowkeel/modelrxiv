@@ -164,15 +164,15 @@ a.logo {
 .menu .tabs {
 	background: #eee;
 }
-.menu .tabs>a {
+.menu .tabs>[data-tab] {
 	padding: 3px 10px;
 	color: #555;
 	display: inline-block;
 }
-.menu .tabs>a.selected {
+.menu .tabs>[data-tab].selected {
 	background: #fff;
 }
-.menu [data-tab-content] {
+[data-tab-content] {
 	display: none;
 }
 [data-tab-content].show + [data-tab-content].show {
@@ -804,7 +804,8 @@ polygon.proportion:hover {
 	border-bottom: 2px solid #ddd;
 	position: relative;
 }
-.tabs>a {
+.tabs>[data-tab], [data-module="model"] .tabs>a {
+	cursor: pointer;
 	display: inline-block;
 	font-size: 14px;
 	position: relative;
@@ -813,16 +814,25 @@ polygon.proportion:hover {
 	border-bottom: 2px solid #6dbbcd;
 	color: #555;
 }
-.tabs>a:hover {
+.tabs>[data-tab]:hover, [data-module="model"] .tabs>a:hover {
 	background: #eee;
 }
-.tabs>a.selected {
-	background: #eee;
-	border-bottom-color: #ddd;
+.tabs>[data-action] {
+	display: inline-block;
+	padding: 5px 10px;
 }
-.tabs>a[data-icon]:before {
+.menu .tabs>[data-tab].selected {
+	background: #ddd;
+	/* border-bottom-color: #ddd; */
+}
+.tabs>[data-tab][data-icon]:before, [data-module="model"] .tabs>a[data-action]:before {
 	margin-right: 4px;
 	font-size: 13px;
+}
+.tabs>[data-tab] [data-action="close"] {
+	color: #555;
+	font-size: 11px;
+	margin-left: 5px;
 }
 .result-tab {
 	right: 142px;
@@ -976,6 +986,10 @@ polygon.proportion:hover {
 	float: left;
 	width: 25%;
 	padding-left: 5%;
+}
+.wide-form .tabs select {
+	width: 200px;
+	margin-left: 5px;
 }
 .entry {
 	display: flex;
@@ -1213,6 +1227,9 @@ h2 a.tag {
 .editor {
 	position: relative;
 }
+.editor .code {
+	position: relative;
+}
 .editor .error {
 	display: none;
 	position: absolute;
@@ -1233,11 +1250,25 @@ h2 a.tag {
 	min-width: 100%;
 	max-width: 100%;
 	height: 500px;
+	outline: none;
 	float: none;
 	font-size: 14px;
 	font-family: monospace;
+	vertical-align: top;
 	background: #fff;
 	padding: 5px;
+}
+.editor textarea[name="code_display"] {
+	line-height: 1.6;
+	height: 700px;
+}
+.editor .comment {
+	background: #f0f0f0;
+	padding: 5px 10px;
+	margin: 0;
+	border: 1px solid #ccc;
+	font-size: 14px;
+	border-top: 0;
 }
 .editor .watermark {
 	position: absolute;
@@ -1245,6 +1276,24 @@ h2 a.tag {
 	opacity: 0.5;
 	right: 10px;
 	font-size: 14px;
+}
+.editor .tabs>[data-tab] {
+	background: #fff;
+	padding: 4px 12px;
+	border-bottom-width: 4px;
+	top: 4px;
+}
+.editor .tabs>[data-tab].selected {
+	background: #f0f0f0;
+}
+.editor .tabs>[data-tab][data-status="test-success"] {
+	border-color: #00ba00;
+}
+.editor .tabs>[data-tab][data-status="test-fail"] {
+	border-color: #ba0000;
+}
+.editor .tabs {
+	border-bottom-width: 4px;
 }
 .toolbar {
 	display: none;

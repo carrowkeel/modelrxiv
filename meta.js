@@ -51,7 +51,7 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 	}).then(combineStatResults);
 	//const {module: plot_container} = await addModule(group, 'plot', {job: {id}});
 	const step = Object.keys(param_ranges).reduce((a,k) => Object.assign(a, {[k]: param_ranges[k].type === 'select' ? 1 : (param_ranges[k].range[1] - param_ranges[k].range[0] === 0 ? 1 : (param_ranges[k].range[1] - param_ranges[k].range[0])) / 2**param_ranges[k].range[2]}), {});
-	const axes = ['x', 'y', 'z', 's'].reduce((axes, axis) => {
+	const axes = ['x', 'y'].reduce((axes, axis) => {
 		if (!param_ranges[axis])
 			return axes;
 		switch(param_ranges[axis].type) {
@@ -67,7 +67,6 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 			dist(user_params, axes.x.map(x => {
 				return {[param_ranges.x.name]: x};
 			})).then(async results => {
-				console.log(results);
 				for (const stat in results) {
 					const output = Object.assign({}, entry.result_params.find(param => param.name === stat));
 					const output_values = output.type === 'disc' ? Object.fromEntries(output.values.map(output => [output.name, output])) : {};
@@ -123,87 +122,6 @@ const init = async (container, entry, user_params, param_ranges, title='Meta', i
 				}
 				//group.querySelectorAll('.plot').forEach(plot => plot.dispatchEvent(new Event('update')));
 			});
-			break;
-		}
-		case 3: { // At the moment this is for discrete parameters only
-			const stat = entry.result_params[0].name; // Temporary to avoid breaking this
-			const combine = (values) => {
-				return values.reduce((a,v) => {
-					return Object.assign(a, {[v]: a[v] ? a[v] + 1 / values.length : 1 / values.length});
-				}, {});
-			};
-			const values = await dist(user_params, axes.z.reduce((a,z) => {
-				return a.concat(axes.y.reduce((_a,y) => {
-					return _a.concat(axes.x.map(x => {
-						return {[param_ranges.x.name]: x, [param_ranges.y.name]: y, [param_ranges.z.name]: z};
-					}));
-				}, []));
-			}, [])).then(results => {
-				return range(0, axes.z.length).map(i => {
-					return combine(results[stat].slice(i*axes.x.length*axes.y.length, (i+1)*axes.x.length*axes.y.length));
-				});
-			});
-			const keys = Object.keys(values.reduce((a, v) => Object.keys(v).reduce((_a, k) => Object.assign(_a, {[k]: 1}), a), {}));
-			const output_values = entry.result_params[0].values.reduce((a,v) => Object.assign(a, {[v.name]: v.value}), {});
-			const sorted_keys = keys.sort((a,b) => output_values[a] - output_values[b]);
-			const lines = keys.map(_i => values.map((value, i) => [[axes.z[i], value[_i] ? value[_i] : 0]]));
-			const group = document.createElement('div');
-			group.classList.add('group');
-			container.appendChild(group);
-			for (const i in lines) {
-				const {module: plot_module} = await addModule(group, 'plot');
-				plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
-					name: `${plot_name}_${keys[i]}`,
-					type: 'line_plot_x',
-					xbounds: param_ranges.z.range.slice(0, 2),
-					ybounds: [0, 1], // This limits this type of plot to proportions of outcomes
-					draw: 'svg',
-					param_ranges,
-					labels: {title: `${title}, ${keys[i]}`, x: param_ranges.z.label, y: 'Proportion'},
-					outputs: entry.result_params
-				}, params: user_params}}));
-				plot_module.querySelector(`[data-name="${plot_name}_${keys[i]}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: lines[i]}}));
-			}
-			group.querySelectorAll('.plot').forEach(plot => plot.dispatchEvent(new Event('update')));
-			break;
-		}
-		case 4: {
-			const stat = entry.result_params[0].name; // Temporary to avoid breaking this
-			const input_grids = axes.z.reduce((a,z) => {
-				return a.concat(axes.y.reduce((_a,y) => {
-					return _a.concat(axes.x.map(x => {
-						return {[param_ranges.x.name]: x, [param_ranges.y.name]: y, [param_ranges.z.name]: z};
-					}));
-				}, []));
-			}, []);
-			const filtered_grids = await dist(Object.assign({}, user_params, {[param_ranges.s.name]: param_ranges.s.range[0], repeats: 1}), input_grids).then(results => {
-				return range(0, axes.z.length).map(i => {
-					return input_grids.slice(i*axes.x.length*axes.y.length, (i+1)*axes.x.length*axes.y.length)
-						.filter((_,_i, input) => {
-							return results[stat][i * input.length + _i] === user_params.outcome;
-						});
-				});
-			});
-			const filtered_indexes = [0].concat(cumsum(filtered_grids.slice(0, filtered_grids.length - 1).map(grid => grid.length)));
-			const values = await dist(Object.assign({}, user_params, {[param_ranges.s.name]: param_ranges.s.range[1]}), filtered_grids.reduce((a,v) => a.concat(v), [])).then(results => {
-				return filtered_indexes.map((_,i) => mean(results[stat].slice(filtered_indexes[i], filtered_indexes[i+1])));
-			});
-			const line = values.map((value,i) => [[axes.z[i], value]]);
-			const group = document.createElement('div');
-			group.classList.add('group');
-			container.appendChild(group);
-			const {module: plot_module} = await addModule(group, 'plot');
-			plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot: {
-				name: `${plot_name}_${stat}`,
-				type: 'line_plot_x',
-				xbounds: param_ranges.z.range.slice(0, 2),
-				ybounds: [0, 1],
-				draw: 'svg',
-				param_ranges,
-				labels: {title, x: param_ranges.z.label, y: 'Proportion'},
-				outputs: entry.result_params
-			}, params: user_params}}));
-			plot_module.querySelector(`[data-name="${plot_name}_${stat}"]`).dispatchEvent(new CustomEvent('update', {detail: {data: line}}));
 			break;
 		}
 	}

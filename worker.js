@@ -15,7 +15,6 @@ const pythonModuleWrapper = async (module_url, reload=false) => ({
 		try {
 			const pyodide = await loadPyodide({indexURL: 'https://modelrxiv.org/pyodide/'});
 			await pyodide.loadPackage('numpy'); // NumPy loaded by default, implement module definition in model builder
-			await pyodide.loadPackage('matplotlib');
 			return pyodide;
 		} catch (e) {
 			return pyodide;
