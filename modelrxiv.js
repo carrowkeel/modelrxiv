@@ -198,8 +198,9 @@ const navigate = async (env, url, back=false, reload=false) => {
 		clearTimeout(env.processes[slug].timeout);
 		delete env.processes[slug];
 	}
-	const query = queryFromPath(url || window.location.pathname);
-	const pagename = window.location.pathname.substring(1);
+	const uri = url || window.location.pathname;
+	const query = queryFromPath(uri);
+	const pagename = uri.substring(1);
 	const main_elem = document.querySelector('.main');
 	const static_pages = {login: 'Login', register: 'Register', privacy: 'Privacy', terms: 'Terms', contribute: 'Contribute'}; // Remove using cloudfront origin function or similar solution
 	switch(true) {

@@ -19,7 +19,7 @@
 <div class="content">
 <div class="editor">
 <div class="tabs">
-<select class="fright" name="framework"><option value="js">JavaScript</option><option value="node.js">JavaScript (Node.js)</option><option value="py">Python 3</option><option value="R">R</option></select><a data-action="test-code" class="fright">Test</a><a data-action="import-code" class="fright">Build</a>
+<select class="fright" name="framework"><option value="js">JavaScript</option><option value="node.js">JavaScript (Node.js)</option><option value="py">Python 3</option><option value="R">R</option></select><a data-action="test-code" class="fright">Test</a><a data-action="import-code" class="fright">Build</a><a data-action="compile-code" class="fright">Compile</a>
 <a data-tab="main" data-status="edited" class="selected">Main</a>
 </div>
 <div data-tab-content="main" class="code show" data-status="edited">
