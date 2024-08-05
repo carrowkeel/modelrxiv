@@ -1,0 +1,29 @@
+To be compatible with modelRxiv, model code must implement a step function that takes the model parameters (params), the previous step, and the time point (t), and returns the next step (models can be written in Python or JavaScript). The code can have other functions that can be called within the step function. Following a functional programming approach, the state of the model should not be maintained through globals but using the "last_step" variable as shown below.
+
+```python
+def step(params: dict, last_step: dict, t: int) -> dict: ## Contains the main model logic
+    ## Compute the next step given the last step and the model parameters
+    ## For example, return the next step of a population genetics model
+    if t == 0: When called the first time, return the initial step
+        return {'q': params['q0']}
+    q = last_step['q']
+    s = params['s']
+    h = params['h']
+    q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2)
+    return {'q': q_prime}
+```
+
+```javascript
+const step = (params, last_step, t) => { // Contains the main model logic
+    // Compute the next step given the last step and the model parameters
+    // For example, return the next step of a population genetics model
+    if (t === 0) { // When called the first time, return the initial step
+        return {'q': params['q0']};
+    }
+    let q = last_step['q'];
+    let s = params['s'];
+    let h = params['h'];
+    let q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2);
+    return {'q': q_prime};
+}
+```

@@ -1,426 +1,282 @@
+import { shortNotation, mathNotation, generateID, queryFromPath, replaceStrings, toCSV, errorBox } from '/apc/common.js';
+import { parametersForm, readForm } from '/apc/form.js';
+import { cacheString, getIDBObject } from '/apc/cache.js';
+import { initializePlots, updatePlots } from '/apc/plot.js';
+import { attachWorker } from '/apc/jobs.js';
 
-const formatLabel = text => {
-	const label = text.replace(/(^|[^a-zA-Z])([^\s\p{P}])(_|\^)(\{([^\{]+)\}|[^\s\p{P}])/u, (_, pre, name, type, sub, sub_curly) => `${pre}${name}<${type === '_' ? 'sub' : 'sup'}>${sub_curly || sub}</${type === '_' ? 'sub' : 'sup'}>`);
-	return text.match(/^[^\s\p{P}](_|$)/u) ? `<i>${label}</i>` : label;
+const getCredentials = async (property) => {
+	const credentials = await getIDBObject('apc', 'auth', 'credentials');
+	return credentials[property];
 };
 
-const fieldsFromForm = (input_params, query) => {
-	return input_params.map(param => {
-		const {name, label, type, default_value, range: _range, values, description} = param;
-		const range = _range ? _range.split(',') : [0, 1]; // Temp
-		const input_field = (() => {
-			switch(type) {
-				case 'vector':
-				case 'cont':
-					return `<input type="text" data-type="${type}" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}"><input type="text" class="range" name="${name}" value="${range[0]}" title="${description} range start"><input type="text" class="range" name="${name}" value="${range[1]}" title="${description} range end"><input type="text" class="range" name="${name}" value="5" title="${description} resolution (2^x)">`;
-				case 'disc':
-					return values ? `<select class="value" data-type="cont" name="${name}" title="${description}">${values.map(flag => `<option value="${flag.name}"${(query && query[name] !== undefined ? query[name] : default_value) === flag.name ? 'selected' : ''}>${flag.name}</option>`).join('')}</select>` : `<input type="text" data-type="${type}" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">`;
-				case 'json':
-					return `<input type="text" data-type="json" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">`;
-			}
-		})();
-		return `<div class="option" data-name="${name}" data-type="${type}" data-label="${label}"><label title="${description}"><input type="text" disabled="disabled">${formatLabel(label)}</label><div class="values">${input_field}</div></div>`;
-	}).join('');
+const presetsText = (presets) => presets === undefined ? '' : presets.map(preset => `<div class="preset"><a data-preset="${preset.label}" title="${Object.entries(preset).map(([param, value]) => `${param}=${value}`).join('\n')}">${preset.label}</a></div>`).join('');
+
+const defaultsFromScheme = (scheme) => {
+	return scheme.parameter ? Object.fromEntries(scheme.parameter.map(parameter => [parameter.name, parameter.value])) : {};
 };
 
-const draw = (container, data, offset=0, flush=false) => { // TODO: move preview flag elsewhere/combine with below
-	container.querySelectorAll(`[data-plot][data-name]`).forEach((plot,i) => data[0][plot.dataset.name] !== undefined ? plot.dispatchEvent(new CustomEvent('update', {detail: {data: data.map(step => step[plot.dataset.name]), offset, flush}})) : 0);
-};
-
-const pythonModuleWrapper = async (elem, module, reload=false) => ({
-	module: await fetch(module.module_url, {cache: reload ? 'no-cache' : 'default'}).then(res => res.text()),
-	pyodide: await (async () => {
-		try {
-			elem.dispatchEvent(new Event('loading'));
-			if (typeof loadPyodide !== 'function')
-				await loadScript('/pyodide/pyodide.js');
-			const pyodide = await loadPyodide({indexURL: 'https://modelrxiv.org/pyodide/'});
-			await pyodide.loadPackage('numpy');
-			if (module.modules) {
-				for (const module_name of module.modules.split(','))
-					await pyodide.loadPackage(module_name);
-			}
-			elem.dispatchEvent(new Event('loaded'));
-			return pyodide;
-		} catch (e) {
-			elem.dispatchEvent(new Event('loaded'));
-			return pyodide;
-			// Ignore "already loaded" error
-		}
-	})(),
-	step: function (params, _step, t) {
-		const code = `${this.module}
-out = step(params, _step, ${t})
-`;
-		this.pyodide.globals.set('params', this.pyodide.toPy(params));
-		this.pyodide.globals.set('_step', this.pyodide.toPy(_step));
-		this.pyodide.runPython(code);
-		const outputPr = this.pyodide.globals.get('out');
-		if (!outputPr)
-			return false;
-		const out = outputPr.toJs();
-		outputPr.destroy();
-		return out instanceof Map ? Object.fromEntries(out) : out;
-	}
-});
-
-const stepWrapper = (container, step_module, params, _step, storage=[]) => {
-	const t = storage.length;
-	const plots_container = container.querySelector('.plots');
-	const complete = (params, storage) => { // TODO: decide how result is handled in dynamics mode
-		const result = step_module.result ? step_module.result(params, storage) : {};
-		container.querySelector('.result-tab').innerHTML = '<h4>Result</h4><pre>'+Object.entries(result).map(([param, value]) => `${param}: ${value}\n`).join('')+'</pre>';
-		//container.querySelector('.result-tab').classList.add('show');
-		setTimeout(() => {
-			container.querySelector('.result-tab').classList.remove('show');
-		}, 5000);
-		draw(plots_container, storage, 0, true);
-		return false;
-	};
-	if (t - 1 === parseInt(params.target_steps)) {
-		complete(params, storage);
-		return false;
-	} else {
-		const step = step_module.step(params, _step, t);
-		if (!step)
-			return complete(params, storage);
-		storage.push(step);
-		draw(plots_container, storage, 0, true);
-		return step;
-	}
-};
-
-const parsePresets = (presetText) => {
+export const parseModelScheme = (model_id, scheme) => {
+	const lines = scheme.trim().split('\n');
+	const metadata = {model_id};
 	const cache = [];
-	const presets = [];
-	const formatPreset = input => ({label: input[0], type: input.slice(1).reduce((a,param) => a || param[1].match(/\[([0-9\.\-e,]+)\]/), false) ? 'grid' : 'dynamics', text: input.slice(1).map(v => v.join(' = ')).join('\n'), params: input.slice(1).map(v => v.join('=')).join(';')});
-	presetText.split('\n').forEach(line => {
-		if (line.startsWith('#')) {
-			if (cache.length > 0)
-				presets.push(formatPreset(cache));
-			cache.length = 0;
-			cache.push(line.replace(/^[#]+[ ]*/, ''));
-			return;
-		} else if (line === '')
-			return;
-		const parts = line.replace(/[ ]*/g, '').split('=');
-		cache.push(parts);
-	});
-	if (cache.length > 0)
-		presets.push(formatPreset(cache));
-	return presets;
-};
-
-const runGrid = (entry, form, defaults, plots_elem, title) => {
-	const params = numericize(readForm(form, defaults));
-	const selected = Array.from(form.querySelectorAll('.option.selected'));
-	if (selected.length === 0)
-		return;
-	const param_ranges = selected.reduce((a,field) => Object.assign(a, {[field.querySelector('label input').value]: {name: field.dataset.name, type: field.dataset.type, label: field.dataset.label, range: field.dataset.type === 'select' ? Array.from(field.querySelectorAll('.values option')).map(option => option.value) : Array.from(field.querySelectorAll('.range')).map(input => +(input.value))}}), {});
-	import('./meta.js').then(meta => meta.init(plots_elem, entry, Object.assign({}, params), param_ranges, title));
-};
-
-const defaultsFromInput = input_params => input_params.reduce((defaults, param) => Object.assign(defaults, {[param[0]]: param[3]}), {});
-
-export const model = (env, {entry, query}, elem, storage={}) => ({
-	render: async () => {
-		elem.dataset.type = `${entry.type || 'published'}${entry.private ? ' sandbox' : ''}`;
-		entry.module_url = entry.private ? signedURL(`/users/${getCredentials('user_id')}/${entry.model_id}.${entry.framework}`) : `/models/${entry.model_id}.${entry.framework}`; // Better to avoid updating entry
-		const input_params = entry.input_params || [];
-		const uri = `/${entry.private ? 'sandbox' : 'model'}/${entry.model_id}`;
-		const presets = entry.presets ? parsePresets(entry.presets) : [];
-		const presetHTML = presets.map(preset => `<div class="preset"><a data-preset="${preset.params}" data-title="${preset.label}" data-type="${preset.type}" title="${preset.text}">${preset.label}</a></div>`).join('');
-		switch(true) {
-			case entry.preview: // Date: ${new Date(entry.lastUpdated).toLocaleString('default', {year: 'numeric', month: 'long'})}
-				elem.innerHTML = `<div class="details"><div class="fright"><a data-category="${entry.type || 'published'}">${entry.type || 'published'}</a></div><h3><a href="${uri}" class="title">${entry.title || 'Untitled model'}</a></h3><h4>${typeof entry.authors === 'string' ? entry.authors : `${entry.authors[0]}${entry.authors.length > 2 ? ` <a title="${entry.authors.slice(1).join(', ')}">[...]</a>` : ''}`}</h4>${entry.tags ? `<p>${entry.tags.map(v => `<a href="/tag/${v}" data-tag="${v}">#${v}</a>`).join('')}</p>` : ''}</div>`;
-				break;
-			default:
-				const option_fields = fieldsFromForm(input_params, query);
-				elem.innerHTML = `<div class="fright"><div data-framework="${entry.framework}">.${entry.framework}</div></div><h2>${entry.title}</h2><div class="authors">${entry.authors || ''}. ${entry.doi ? `<a href="https://doi.org/${entry.doi}" target="_blank">doi:${entry.doi}</a>` : ''}</div><div class="description shorten">${entry.description || ''}</div><div class="tabs"><div class="result-tab menu"></div><div class="parameters-menu menu show"><div class="tabs"><a data-tab="parameters" class="${entry.private || presetHTML === '' ? 'selected' : ''}">Parameters</a><a data-tab="presets" class="${entry.private || presetHTML === '' ? '' : 'selected'}">Presets</a></div><div data-tab-content="presets" class="${entry.private || presetHTML === '' ? '' : 'show'}">${presetHTML}</div><div data-tab-content="parameters" class="form ${entry.private || presetHTML === '' ? 'show' : ''}">${option_fields}<div class="clear space"><a class="button" data-action="grid" title="Meta analysis using selected parameters">Grid</a><div class="clear"></div></div></div><div data-tab-content="saved"></div></div><a class="fright" data-action="parameters-menu" title="Edit the model parameters" data-icon="f">Parameters</a><a class="fright" data-action="restart" title="Restart the model" data-icon="r">Restart</a><a class="fright" data-action="start" title="Start/Pause the model" data-icon="p">Run</a><a class="${!query.code ? 'selected' : ''}" href="${uri}" title="Open the model analysis page">Model</a>${getCredentials().user_id ? (entry.private ? `<a href="/edit/${entry.model_id}" title="Edit the model code and parameters">Edit</a><a title="Make the model publicly available (subject to review)" data-action="publish">Publish</a>` : '<a title="Create a local copy of the model" data-action="copy">Copy</a>') : ''}<a class="${query.code ? 'selected' : ''}" href="${uri}/code/latest" title="View the model source code">Code</a></div>${query.code ? '<div class="editor"><textarea disabled="disabled" name="code_display"></textarea></div>' : '<div class="plots" data-empty="Initiate model to load results"></div>'}`;
-				await new Promise(resolve => elem.dispatchEvent(new CustomEvent('init', {detail: {group: true, resolve}})));
-				break;
-		}
-		elem.dispatchEvent(new Event('done'));
-	},
-	hooks: [
-		['[data-module="model"]', 'init', async e => {
-			switch(true) { // Move elsewhere
-				case query.code !== undefined:
-					const code = await fetch(entry.module_url, {cache: 'reload'}).then(res => res.text());
-					elem.querySelector('.editor [name="code_display"]').value = code;
-					break;
-				case elem.querySelector('.plots') !== null:
-					const {plotsFromOutput, groupPlots} = await import('./plot.js');
-					const plots_container = elem.querySelector('.plots');
-					storage.params = numericize(readForm(elem.querySelector('.parameters-menu .form'), defaultsFromInput(entry.input_params)));
-					await Promise.all(plotsFromOutput(entry).map(plot => {
-						if (!plots_container.querySelector(`[data-name="${plot.name}"]`)) {
-							const group = document.createElement('div');
-							group.classList.add('group');
-							plots_container.appendChild(group);
-							return addModule(group, 'plot').then(({module: plot_module}) => plot_module.dispatchEvent(new CustomEvent('init', {detail: {plot, params: storage.params}})))
-						} else
-							plots_container.querySelector(`[data-name="${plot.name}"]`).dispatchEvent(new CustomEvent('modify', {detail: {plot: {xbounds: plot.xbounds}, params: storage.params}}));
-					}));
-					if (e.detail?.group)
-						groupPlots(plots_container);
-			}
-			if (e.detail?.resolve)
-				e.detail.resolve();
-		}],
-
-/*
-const stepWrapper = (container, step_module, params, _step, storage=[]) => {
-	const t = storage.length;
-	const plots_container = container.querySelector('.plots');
-	const complete = (params, storage) => { // TODO: decide how result is handled in dynamics mode
-		const result = step_module.result ? step_module.result(params, storage) : {};
-		container.querySelector('.result-tab').innerHTML = '<h4>Result</h4><pre>'+Object.entries(result).map(([param, value]) => `${param}: ${value}\n`).join('')+'</pre>';
-		//container.querySelector('.result-tab').classList.add('show');
-		setTimeout(() => {
-			container.querySelector('.result-tab').classList.remove('show');
-		}, 5000);
-		draw(plots_container, storage, 0, true);
-		return false;
-	};
-	if (t - 1 === parseInt(params.target_steps)) {
-		complete(params, storage);
-		return false;
-	} else {
-		const step = step_module.step(params, _step, t);
-		if (!step)
-			return complete(params, storage);
-		storage.push(step);
-		draw(plots_container, storage, 0, true);
-		return step;
-	}
-};
-*/
-
-		['[data-module="model"]', 'run', async e => {
-			const plots_container = elem.querySelector('.plots');
-			const step_interval = localStorage.getItem('mdx_step_interval') || 10;
-			if (!storage.loop || e.detail?.reset) {
-				await new Promise(resolve => e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false, resolve}})));
-				const request = {framework: entry.framework, sources: [{type: 'script', private: entry.private, model_id: entry.model_id, framework: entry.framework}], params: storage.params};
-				const stream = await new Promise(resolve => document.querySelector('.apocentric').dispatchEvent(new CustomEvent('dynamics', {detail: {request, resolve}}))).then(stream => stream.getReader());
-				const step_storage = [];
-				if (storage.timeout)
-					clearTimeout(storage.timeout);
-				storage.loop = async () => {
-					if (!document.body.contains(elem))
-						return;
-					if (e.target.dataset.state === 'paused')
-						await new Promise(resolve => e.target.addEventListener('run', resolve, {once: true}));
-					const step = await stream.read();
-					if (step.done)
-						return e.target.dispatchEvent(new Event('stopped'));
-					step_storage.push(step.value);
-					//if (step_storage.length > 101) // This should be managed by the plot itself, receiving another timepoint beyond the x-axis will result in changing the axis or a sliding window
-					//	step_storage.shift();
-					draw(plots_container, step_storage, 0, true);
-					storage.timeout = setTimeout(storage.loop, step_interval);
-				};
-			}
-			if (e.target.dataset.state !== 'paused')
-				storage.loop();
-			e.target.dataset.state = 'running';
-			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'P');
-		}],
-		['[data-module="model"]', 'run_browser', async e => {
-			const step_interval = localStorage.getItem('mdx_step_interval') || 10;
-			if (storage.step_module === undefined || e.detail?.reload) {
-				storage.step_module = entry.framework === 'js' ? await import(`${entry.module_url}${e.detail?.reload ? `?${new Date().getTime()}` : ''}`) : (entry.framework === 'py' ? await pythonModuleWrapper(elem, entry, e.detail?.reload) : false);
-			}
-			if (!storage.loop || e.detail?.reset) {
-				//e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false}}));
-				await new Promise(resolve => e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false, resolve}})));
-				const stats = []; // Rename
-				if (storage.timeout)
-					clearTimeout(storage.timeout);
-				storage.loop = async (_step) => {
-					if (!document.body.contains(elem))
-						return;
-					if (e.target.dataset.state === 'paused')
-						await new Promise(resolve => e.target.addEventListener('run_browser', resolve, {once: true}));
-					const step = stepWrapper(elem, storage.step_module, storage.params, _step, stats);
-					if (!step)
-						return e.target.dispatchEvent(new Event('stopped'));
-					storage.timeout = setTimeout(storage.loop, step_interval, step);
-				};
-			}
-			if (e.target.dataset.state !== 'paused')
-				storage.loop();
-			e.target.dataset.state = 'running';
-			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'P');
-		}],
-		['[data-module="model"]', 'save', e => {
-			const plots_container = elem.querySelector('.plots');
-			const id = Math.round(1e7*Math.random());
-			const cloned = plots_container.cloneNode(true);
-			cloned.setAttribute('class', 'archived-plots');
-			cloned.dataset.saved = id;
-			plots_container.parentElement.appendChild(cloned);
-			const button = document.createElement('div');
-			button.classList.add('preset');
-			button.innerHTML = `<a data-saved="${id}" data-type="dynamics" title="">Saved plots</a>`;
-			elem.querySelector('[data-tab-content="saved"]').appendChild(button);
-		}],
-		['[data-module="model"]', 'pause', e => {
-			e.target.dataset.state = 'paused';
-			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'p');
-		}],
-		['[data-module="model"]', 'stopped', e => {
-			e.target.dataset.state = 'stopped';
-			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'p');
-			delete storage.loop;
-		}],
-		['[data-module="model"]', 'loading', e => {
-			const plots = e.target.querySelector('.plots');
-			plots.classList.add('loading');
-			const div = document.createElement('div');
-			div.classList.add('overlay');
-			div.innerHTML = 'Loading libraries...';
-			plots.appendChild(div);
-		}],
-		['[data-module="model"]', 'loaded', e => {
-			e.target.querySelector('.plots').classList.remove('loading');
-			e.target.querySelectorAll('.plots .overlay').forEach(item => item.remove());
-		}],
-		['a[data-saved]', 'click', e => {
-			const id = e.target.dataset.saved;
-			e.target.classList.toggle('selected');
-			elem.querySelector(`.archived-plots[data-saved="${id}"]`).classList.toggle('show');
-		}],
-		['.menu [data-tab]', 'click', e => {
-			const menu = e.target.closest('.menu');
-			const multiple = menu.classList.contains('multiple-tabs');
-			if (multiple) {
-				e.target.classList.toggle('selected');
-				menu.querySelector(`[data-tab-content="${e.target.dataset.tab}"]`).classList.toggle('show');
-			} else {
-				menu.querySelectorAll('[data-tab]').forEach(elem => elem.classList.remove('selected'));
-				menu.querySelectorAll('[data-tab-content]').forEach(elem => elem.classList.remove('show'));
-				e.target.classList.add('selected');
-				menu.querySelector(`[data-tab-content="${e.target.dataset.tab}"]`).classList.add('show');
-			}
-		}],
-		['[data-action="settings-menu"]', 'click', e => {
-			const plot = e.target.closest('.plot');
-			plot.querySelector('.settings-menu').classList.toggle('show');
-		}],
-		['[data-action="parameters-menu"]', 'click', e => {
-			elem.querySelector('.parameters-menu').classList.toggle('show');
-		}],
-		['[data-action="start"]', 'click', e => {
-			if (elem.dataset.state !== 'running')
-				elem.dispatchEvent(new Event(localStorage.getItem('mdx_state') === 'test' ? 'run' : 'run_browser'));
-			else
-				elem.dispatchEvent(new Event('pause'));
-		}],
-		['[data-action="restart"]', 'click', e => {
-			elem.dispatchEvent(new CustomEvent(localStorage.getItem('mdx_state') === 'test' ? 'run' : 'run_browser', {detail: {reset: true}}));
-		}],
-		['[data-action="save"]', 'click', e => {
-			elem.dispatchEvent(new Event('save'));
-		}],
-		['[data-action="run_model"]', 'click', e => {
-			const menu = e.target.closest('.data-menu');
-			const model = e.target.closest('[data-model]');
-			const plot = e.target.closest('[data-plot]');
-			const display = plot.querySelector('svg, canvas');
-			const param_ranges = JSON.parse(plot.dataset.param_ranges);
-			const [x, y] = [
-				param_ranges.x.range[0] + (param_ranges.x.range[1] - param_ranges.x.range[0]) * menu.dataset.x / display.getBoundingClientRect().width,
-				param_ranges.y.range[0] + (param_ranges.y.range[1] - param_ranges.y.range[0]) * (1 - menu.dataset.y / display.getBoundingClientRect().height)
-			];
-			const params = Object.assign(JSON.parse(plot.dataset.params), {[param_ranges.x.name]: x, [param_ranges.y.name]: y});
-			elem.querySelectorAll(`.parameters-menu .option.selected label`).forEach(elem => elem.click());
-			for (const param of Object.entries(params)) {
-				if (!elem.querySelector(`.parameters-menu [name="${param[0]}"]`))
-					continue;
-				const current_value = elem.querySelector(`.parameters-menu [name="${param[0]}"]`).value;
-				if (current_value == param[1])
-					continue;
-				elem.querySelector(`.parameters-menu [name="${param[0]}"]`).value = param[1];
-				elem.querySelector(`.parameters-menu [name="${param[0]}"]`).classList.add('highlight');
-				setTimeout(() => {
-					elem.querySelector(`.parameters-menu [name="${param[0]}"]`).classList.remove('highlight');
-				}, 500);
-			}
-			elem.dispatchEvent(new Event('run'));
-			menu.classList.remove('show');
-		}],
-		['[data-preset]', 'click', async e => {
-			const preset = e.target.dataset.preset.split(';').map(v => v.split('='));
-			const title = e.target.dataset.title;
-			elem.querySelectorAll(`.parameters-menu .option.selected label`).forEach(elem => elem.click());
-			for (const param of preset) {
-				const range_string = param[1].match(/\[([0-9\.\-e,]+)\]/);
-				if (range_string) {
-					const range_values = range_string[1].split(',');
-					elem.querySelectorAll(`.parameters-menu .option[data-name="${param[0]}"] label`).forEach(elem => elem.click());
-					elem.querySelectorAll(`.parameters-menu [name="${param[0]}"].range`)[0].value = range_values[0];
-					elem.querySelectorAll(`.parameters-menu [name="${param[0]}"].range`)[1].value = range_values[1];
-					elem.querySelectorAll(`.parameters-menu [name="${param[0]}"].range`)[2].value = range_values[2] || 8;
-				} else {
-					const current_value = elem.querySelector(`.parameters-menu [name="${param[0]}"]`).value;
-					if (current_value === param[1])
-						continue;
-					elem.querySelector(`.parameters-menu [name="${param[0]}"]`).value = param[1];
-					elem.querySelector(`.parameters-menu [name="${param[0]}"]`).classList.add('highlight');
-					setTimeout(() => {
-						elem.querySelector(`.parameters-menu [name="${param[0]}"]`).classList.remove('highlight');
-					}, 500);
+	lines.forEach(_line => {
+		const line = _line.trim();
+		const match = line.match(/^#+\s*(plot|parameter|preset|metadata|analysis)[:\s]*(.*)/i);
+		if (match) {
+			const [_, section_type, section_label] = match;
+			const type = section_type.toLowerCase();
+			const label = section_label.trim();
+			if (cache.length !== 0) {
+				const current_section = cache.pop();
+				if (current_section.type === 'metadata')
+					Object.assign(metadata, current_section.attributes);
+				else {
+					if (metadata[current_section.type] === undefined)
+						metadata[current_section.type] = [];
+					metadata[current_section.type].push(current_section.attributes);
 				}
 			}
-			const selected = elem.querySelectorAll('.parameters-menu .option.selected');
-			if (selected.length > 0)
-				runGrid(entry, elem.querySelector('.parameters-menu .form'), query, elem.querySelector('.plots'), title);
-			else
-				elem.dispatchEvent(new Event(localStorage.getItem('mdx_state') === 'test' ? 'run' : 'run_browser'));
-		}],
-		['.option label', 'click', e => {
-			const option = e.target.closest('.option');
-			if (option.classList.contains('selected')) {
-				option.querySelector('label input').value = '';
-				return option.classList.remove('selected');
-			}
-			const letters = ['x', 'y']; // TODO: replace this solution
-			const selected = Array.from(e.target.closest('.form').querySelectorAll('.option.selected'));
-			const current_dims = selected.map(elem => elem.querySelector('label input').value);
-			const remaining_dims = letters.filter(v => !current_dims.includes(v));
-			if (remaining_dims.length > 0) {
-				option.classList.add('selected');
-				option.querySelector('label input').value = remaining_dims[0];
-			}
-		}],
-		['[data-action="grid"]', 'click', e => {
-			runGrid(entry, elem.querySelector('.parameters-menu .form'), query, elem.querySelector('.plots'));
-		}],
-		['[data-action="copy"]', 'click', e => {
-			fetch(`https://d.modelrxiv.org/submit`, {method: 'POST', headers: {Authorization: `Basic ${getCredentials('token')}`}, body: JSON.stringify({action: 'copy', model_id: entry.model_id, framework: entry.framework})}).then(res => res.json())
-				.catch(e => {
-					console.log('Failed to copy model', e);
-				})
-				.then(res => {
-					document.querySelector('.main').dispatchEvent(new CustomEvent('navigate', {detail: {url: `/sandbox/${res.model_id}`}}));
-				});
-		}],
-		['[data-action="publish"]', 'click', e => {
-			fetch(`https://d.modelrxiv.org/submit`, {method: 'POST', headers: {Authorization: `Basic ${getCredentials('token')}`}, body: JSON.stringify({action: 'publish', model_id: entry.model_id, framework: entry.framework})}).then(res => res.json())
-				.catch(e => {
-					console.log('Failed to publish model', e);
-				})
-				.then(() => {
-					document.querySelector('.main').dispatchEvent(new CustomEvent('navigate', {detail: {url: '/'}}));
-				});
-		}],
-		['[data-action="update"]', 'click', e => {
-			const query = numericize(window.location.pathname.substring(1).split('/').reduce((a,v,i,arr)=>i%2===0&&arr[i+1]!==undefined?Object.assign(a, {[v]: arr[i+1]}):a, {}));
-			const params = readForm(e.target.closest('.form'), query);
-			const url = '/'+Object.keys(params).map(v=>[v, Array.isArray(params[v]) ? params[v].join(',') : (typeof params[v] === 'object' ? JSON.stringify(params[v]) : params[v])].join('/')).join('/');
-			document.querySelector('.main').dispatchEvent(new CustomEvent('navigate', {detail: {url}}));
-		}],
-	]
-});
+			cache.push({type, attributes: {label}});
+		} else if (line.includes('=')) {
+			const [key, value] = line.split('=', 2);
+			if (cache.length !== 0)
+				cache[0].attributes[key.trim()] = value.trim();
+		}
+	});
+	if (cache.length !== 0) {
+		const current_section = cache.pop();
+		if (current_section.type === 'metadata') {
+			Object.assign(metadata, current_section.attributes);
+		} else {
+			if (metadata[current_section.type] === undefined)
+				metadata[current_section.type] = [];
+			metadata[current_section.type].push(current_section.attributes);
+		}
+	}
+	return metadata;
+};
+
+const dynamicsScript = async (params, framework='py') => { // Store statically
+	switch(framework) {
+		case 'py':
+			const module_script = await fetch(params.script_uri).then(res => res.text());
+			return `${module_script}
+
+async def run(params):
+	last_step = None
+	t = 0
+	while True:
+		last_step = step(params, last_step, t)
+		if last_step == False:
+			break
+		message({'type': 'stream', 'data': {**last_step, 't': t}})
+		t = await increment_step(t)
+		if t == False:
+			break
+	message({'type': 'stream', 'data': False})
+`;
+		case 'js':
+			return `export const run = async (params) => {
+	const step_module = await import(params.script_uri);
+	let last_step = null;
+	let t = 0;
+	while(true) {
+		last_step = step_module.step(params, last_step, t);
+		if (last_step === false)
+			break;
+		self.message({type: 'stream', data: Object.assign({}, last_step, {t})});
+		t = await self.increment_step(t);
+		if (t === false)
+			break;
+	}
+	self.message({type: 'stream', data: false});
+};
+`;
+	}
+};
+
+const generatePlot = async (model_elem, scheme, preset) => {
+	const analysis = scheme.analysis.find(analysis => analysis.label === preset.analysis);
+	if (!analysis)
+		throw 'Analysis not defined in scheme';
+	const request_id = await generateID(8);
+	const params = Object.assign(defaultsFromScheme(scheme), readForm(model_elem.querySelector('[data-content="parameters"]')), {script_uri: scheme.script_uri});
+	const handler = async (e) => {
+		const request = e.detail;
+		if (request.request_id !== request_id || request.type !== 'result')
+			return;
+		const result = request.data;
+		const plots = formatPlots([Object.assign({}, analysis, {label: preset.label})], scheme.parameter);
+		initializePlots(model_elem.querySelector('.plots'), plots);
+		updatePlots(model_elem.querySelector('.plots'), plots, result, false);
+	};
+	model_elem.addEventListener('worker_response', handler);
+	model_elem.dispatchEvent(new CustomEvent('deploy', {detail: {request_id, script_uri: scheme.script_uri, function_name: analysis.function, framework: scheme.framework || 'py', params: parseNumeric(params)}}));
+};
+
+const runDynamics = async (model_elem, scheme, request_id, params) => {
+	const steps = [];
+	const cache_output = [];
+	const plots = formatPlots(scheme.plot, scheme.parameter, params);
+	const increment_step = t => {
+		model_elem.dispatchEvent(new CustomEvent('worker_message', {detail: {type: 'step', request_id, step: t}}));
+	};
+	let t = 0;
+	const handler = async (e) => {
+		const request = e.detail;
+		if (request.request_id !== request_id || request.type !== 'stream')
+			return;
+		const step_data = request.data;
+		if (model_elem.dataset.instance !== request_id) {
+			model_elem.removeEventListener('message', handler);
+			return;
+		}
+		if (!step_data) {
+			model_elem.removeEventListener('message', handler);
+			model_elem.dispatchEvent(new Event('complete'));
+			cacheString(`/dynamics/${request_id}.json`, JSON.stringify(cache_output));
+			return;
+		}
+		steps.push(step_data);
+		cache_output.push(Object.fromEntries(Object.entries(step_data).filter(([key, value]) => typeof value === 'string' || typeof value === 'number')));
+		if (steps.length > 2)
+			steps.shift();
+		model_elem.dispatchEvent(new Event('data'));
+		updatePlots(model_elem, plots, steps, t === 0);
+		if (model_elem.classList.contains('paused')) {
+			await new Promise(resolve => {
+				model_elem.addEventListener('run', e => resolve(), {once: true});
+			});
+		}
+		await new Promise(resolve => setTimeout(resolve, 10));
+		increment_step(t >= (params['step_num'] || 100) ? false : ++t);
+	};
+	model_elem.addEventListener('worker_response', handler);
+	const script = await dynamicsScript(params, scheme.framework);
+	model_elem.dispatchEvent(new CustomEvent('deploy', {detail: {request_id, script, framework: scheme.framework || 'py', params}}));
+};
+
+const parseNumeric = params => Object.fromEntries(Object.entries(params).map(([name, value]) => !isNaN(value) ? [name, +(value)] : [name, value]));
+
+const hooks = scheme => [
+	['*', 'run', async e => {
+		if (e.target.classList.contains('running'))
+			return e.target.classList.toggle('paused');
+		e.target.classList.add('running');
+		const params = Object.assign(defaultsFromScheme(scheme), readForm(e.target.querySelector('[data-content="parameters"]')), {script_uri: scheme.script_uri});
+		const request_id = await generateID(8);
+		e.target.dataset.instance = request_id;
+		e.target.dispatchEvent(new Event('loading'));
+		runDynamics(e.target, scheme, request_id, parseNumeric(params));
+	}],
+	['*', 'complete', e => {
+		e.target.classList.remove('running');
+	}],
+	['*', 'loading', e => {
+		const plots = e.target.querySelector('.plots');
+		plots.classList.add('loading');
+		const div = document.createElement('div');
+		div.classList.add('overlay');
+		div.innerHTML = 'Loading libraries...';
+		plots.appendChild(div);
+	}],
+	['*', 'data', e => {
+		if (!e.target.querySelector('.plots .overlay'))
+			return;
+		e.target.querySelector('.plots').classList.remove('loading');
+		e.target.querySelector('.plots .overlay').remove();
+	}],
+	['[data-action="start"]', 'click', e => {
+		e.target.closest('[data-module="model"]').dispatchEvent(new Event('run'));
+	}],
+	['[data-action="restart"]', 'click', e => {
+		e.target.closest('[data-module="model"]').classList.remove('running');
+		e.target.closest('[data-module="model"]').dispatchEvent(new Event('run'));
+	}],
+	['[data-action="export"]', 'click', async e => {
+		const instance = e.target.closest('[data-module="model"]').dataset.instance;
+		if (!instance)
+			throw 'Run dynamics before exporting data';
+		const data = await fetch(`/dynamics/${instance}.json`).then(res => res.json());
+		toCSV('dynamics.csv', data);
+	}],
+	['[data-action="edit"]', 'click', async e => {
+		window.location.href = `/edit/${scheme.model_id}`;
+	}],
+	['[data-action="publish"]', 'click', async e => {
+		try {
+			const res = await fetch(`https://d.modelrxiv.org/submit_beta`, {method: 'POST', headers: {Authorization: `Basic ${await getCredentials('token')}`}, body: JSON.stringify({action: 'publish', model_id: scheme.model_id, framework: scheme.framework})});
+			if (!res.ok)
+				throw 'Request failed';
+			errorBox('Successfully submitted model', 'Your model will now be manually screened to assure that your code is compliant');
+		} catch (e) {
+			errorBox('Failed to publish model', 'An error was encountered submitting your model');
+			console.log('Failed to publish model:', e);
+		}
+	}],
+	['[data-action="parameters-menu"]', 'click', e => {
+		e.target.closest('[data-module="model"]').querySelector('.parameters-menu').classList.toggle('show');
+	}],
+	['[data-preset]', 'click', async e => {
+		const model_elem = e.target.closest('[data-module="model"]');
+		const preset = scheme.preset.find(preset => preset.label === e.target.dataset.preset);
+		Object.entries(preset).forEach(([param, value]) => model_elem.querySelector(`.parameters-menu [name="${param}"]`) ? model_elem.querySelector(`.parameters-menu [name="${param}"]`).value = value : 0);
+		if (preset.analysis)
+			generatePlot(model_elem, scheme, preset);
+		else
+			model_elem.dispatchEvent(new Event('run'));
+	}]
+];
+
+const parseAxisLimits = (notation, plot_axis, scheme_parameters, user_parameters, default_value=[0, 1]) => {
+	if (notation) {
+		const parts = notation.replace(/[\[\]]+/g, '').split(',').map(part => {
+			if (!isNaN(part))
+				return +(part);
+			if (user_parameters && user_parameters[part])
+				return user_parameters[part];
+			const axis_parameter = scheme_parameters.find(param => part === param.name || (part === 't' && param.name === 'step_num'));
+			if (axis_parameter)
+				return axis_parameter.value;
+		});
+		return parts;
+	}
+	const axis_data_parameter = plot_axis ? plot_axis.split(',')[0] : '';
+	const axis_parameter = scheme_parameters.find(param => axis_data_parameter === param.name || (axis_data_parameter === 't' && param.name === 'step_num'));
+	return (axis_parameter ? (user_parameters && user_parameters[axis_parameter.name] ? [0, user_parameters[axis_parameter.name]] : [0, axis_parameter.value]) : default_value);
+};
+
+const formatPlots = (plots, scheme_parameters, user_parameters) => {
+	return plots.map(plot => {
+		const xlim = parseAxisLimits(plot.xlim, plot.x, scheme_parameters, user_parameters, [0, 100]);
+		const ylim = parseAxisLimits(plot.ylim, plot.y, scheme_parameters, user_parameters, [0, 1]);
+		return Object.assign({}, plot, {xlim, ylim});
+	});
+};
+
+export const init = async (container, query_path=window.location.pathname) => {
+	const query = queryFromPath(query_path);
+	const model_id = query.code || query.sandbox || query.model;
+	const scheme = await fetch(`/${query.sandbox ? `user/${model_id}` : `models/${model_id}`}.txt`).then(res => res.text()).then(text => parseModelScheme(model_id, text));
+	const framework = scheme.framework || 'py';
+	if (query.code)
+		scheme.code = await fetch(`/models/${model_id}.${framework}`).then(res => res.text());
+	scheme.script_uri = query.sandbox ? `/user/${model_id}.${framework}` : `/models/${model_id}.${framework}`;
+	replaceStrings(Object.assign({}, scheme, {presets: presetsText(scheme.preset), parameters: parametersForm(scheme.parameter)}));
+	container.querySelectorAll('.shorten').forEach(elem => {
+		const text = elem.innerHTML;
+		if (text.length < 200)
+			return;
+		const shortened = text.substring(0, 150);
+		elem.innerHTML = `<div class="short">${shortened}... <a data-action="more">Read more</a></div><div class="long">${text} <a data-action="more">Read less</a></div>`;
+	});
+	if (!scheme.preset || scheme.preset.length === 0)
+		container.querySelector('[data-tab="parameters"]')?.click();
+	container.querySelectorAll('.model-link').forEach(elem => elem.setAttribute('href', `/model/${model_id}`));
+	container.querySelectorAll('.code-link').forEach(elem => elem.setAttribute('href', `/code/${model_id}`));
+	addHooks(container, hooks(scheme));
+	if (!query.code) {
+		initializePlots(container.querySelector('.plots'), formatPlots(scheme.plot, scheme.parameter));
+		attachWorker(container);
+	}
+};

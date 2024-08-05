@@ -3,26 +3,45 @@
 <head>
 <title>modelRxiv</title>
 <meta charset="UTF-8">
-<meta name="description" content="An open-source repository of published biological models and data analysis pipelines, and a sandbox for model development with compatibility for multiple programming languages and frameworks">
+<meta name="description" content="An open-source repository of published biological models and data analysis pipelines">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" type="text/css" href="/css/main.css">
 </head>
 <body>
 <header>
 	<div class="wrap">
-		<nav class="fright"><span class="apocentric"></span><span class="mdx-auth"><a href="/login" data-icon="l"></a></span></nav>
+		<nav class="fright"><div class="auth" data-module="apc/auth" data-auth="guest"><span data-auth="guest"><a data-action="login" data-icon="l">Login</a></span><span data-auth="auth"><a data-icon="u" href="/submit.html" title="Upload model">Upload</a><a data-icon="L" data-action="logout" title="Logout">Logout</a></span></div></nav>
 		<a href="/" class="logo" data-icon="A">modelRxiv</a>
 	</div>
 </header>
 <div class="wrap">
-	<div class="main">
+	<div class="main" data-module="list">
+		<div class="intro">
+			<p><b>modelRxiv</b> is an open-source repository of published biological models and data analysis pipelines, and a sandbox for model development with compatibility for multiple programming languages and frameworks. In addition to standardized visualization options, the platform also provides an intuitive model analysis interface for exploring the parametric spaces of submitted models. Please see the <a href="https://www.biorxiv.org/content/10.1101/2022.02.16.480599v1" target="_blank">preprint</a> for more information on submitting models and using the development sandbox.</p>
+		</div>
+		<div class="filtered-list">
+			<div class="filters form narrow">
+				<h4>Filters</h4>
+				<p><span data-count="">0</span> models found</p>
+				<input type="text" name="search" placeholder="Search">
+				<select name="order" data-name="order"><option value="last_modified">Order by date</option><option value="title">Order by title</option></select>
+				<h4>Category</h4>
+				<p><input type="checkbox" name="type" value="published" checked="checked"> Peer-reviewed (<span data-count="type:published">0</span>)</p>
+				<p><input type="checkbox" name="type" value="education" checked="checked"> Educational (<span data-count="type:education">0</span>)</p>
+				<p><input type="checkbox" name="type" value="unpublished,preprint" checked="checked"> Unpublished (<span data-count="type:unpublished">0</span>)</p>
+				<h4>Visibility</h4>
+				<p><input type="checkbox" name="visibility" value="public" checked="checked"> Public (<span data-count="visibility:public">0</span>)</p>
+				<p><input type="checkbox" name="visibility" value="sandbox" checked="checked"> Sandbox (<span data-count="visibility:sandbox">0</span>)</p>
+			</div>
+			<div class="model-list" data-empty="No models found"></div>
+		</div>
 	</div>
 </div>
 <footer>
 	<div class="wrap">
 		<div class="col">
-			<p><a href="/terms">Terms of use</a></p>
-			<p><a href="/privacy">Privacy policy</a></p>
+			<p><a href="/terms.html">Terms of use</a></p>
+			<p><a href="/privacy.html">Privacy policy</a></p>
 		</div>
 		<div class="col"></div>
 		<div class="col">
@@ -31,7 +50,6 @@
 		<div class="clear"></div>
 	</div>
 </footer>
-<div class="toolbar"></div>
-<script src="/init.js"></script>
+<script src="/apc/init.js"></script>
 </body>
 </html>

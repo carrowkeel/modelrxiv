@@ -1,0 +1,9 @@
+## Example population genetics model of selection
+def step(params: dict, last_step: dict, t: int) -> dict: ## Contains the main model logic
+	if t == 0: ## When called the first time, return the initial step
+		return {'q': params['q0']}
+	q = last_step['q']
+	s = params['s']
+	h = params['h']
+	q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2)
+	return {'q': q_prime}

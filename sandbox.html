@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>modelRxiv</title>
+<meta charset="UTF-8">
+<meta name="description" content="An open-source repository of published biological models and data analysis pipelines">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" type="text/css" href="/css/main.css">
+</head>
+<body>
+<header>
+	<div class="wrap">
+		<nav class="fright"><div class="auth" data-module="apc/auth" data-auth="guest"><span data-auth="guest"><a data-action="login" data-icon="l">Login</a></span><span data-auth="auth"><a data-icon="u" href="/submit.html" title="Upload model">Upload</a><a data-icon="L" data-action="logout" title="Logout">Logout</a></span></div></nav>
+		<a href="/" class="logo" data-icon="A">modelRxiv</a>
+	</div>
+</header>
+<div class="wrap">
+	<div class="main" data-module="model">
+		<h2 data-content="title"></h2>
+		<div class="authors"><span data-content="authors"></span> <a href="https://doi.org/" target="_blank" data-content="doi"></a></div><div class="description shorten" data-content="description"></div><div class="controls tabs"><div class="result-tab menu"></div><div class="parameters-menu menu tabbed-content show"><div class="tabs"><a data-tab="parameters" class="">Parameters</a><a data-tab="presets" class="selected">Presets</a></div><div data-tab-content="presets" class="selected" data-content="presets"></div><div data-tab-content="parameters" class="form" data-content="parameters"></div></div><a class="fright" data-action="parameters-menu" title="Edit the model parameters" data-icon="f">Parameters</a><a class="fright" data-action="restart" title="Restart the model" data-icon="R">Restart</a><a class="fright" data-action="start" title="Start/Pause the model" data-icon="r">Run</a><a class="selected" href="#" title="Open the model analysis page">Model</a><a data-action="edit" title="Edit the model code and parameters">Edit</a><a data-action="publish" title="Make the model publicly available (subject to review)">Publish</a></div><div class="plots" data-empty="Initiate model to load results"></div>
+	</div>
+</div>
+<footer>
+	<div class="wrap">
+		<div class="col">
+			<p><a href="/terms.html">Terms of use</a></p>
+			<p><a href="/privacy.html">Privacy policy</a></p>
+		</div>
+		<div class="col"></div>
+		<div class="col">
+			<p>Platform code licensed under <a href="/COPYING">AGPLv3</a>. Uploaded models are licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">CC BY 4.0</a> unless otherwise stated.</p>
+		</div>
+		<div class="clear"></div>
+	</div>
+</footer>
+<script src="/apc/init.js"></script>
+</body>
+</html>

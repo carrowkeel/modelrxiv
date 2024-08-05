@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Submit model - modelRxiv</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" type="text/css" href="/css/main.css">
+</head>
+<body>
+<header>
+	<div class="wrap">
+		<nav class="fright"><div class="auth" data-module="apc/auth" data-auth="guest"><span data-auth="guest"><a data-action="login" data-icon="l">Login</a></span><span data-auth="auth"><a data-icon="u" href="/submit.html" title="Upload model">Upload</a><a data-icon="L" data-action="logout" title="Logout">Logout</a></span></div></nav>
+		<a href="/" class="logo" data-icon="A">modelRxiv</a>
+	</div>
+</header>
+<div class="wrap">
+	<div class="main" data-module="submit">
+		<h3 class="upload-model-title">Upload model</h3>
+		<div class="submission-form form wide-form">
+			<div class="section">
+				<div class="header">
+					<a data-icon="G" data-action="generate-scheme" class="fright button" title="Use OpenAI models to generate the model scheme using the current information and the model code">Generate</a>
+					<h3>Metadata and scheme</h3>
+				</div>
+				<div class="content scheme">
+					<div class="editor tabbed-content" data-editor="scheme">
+						<div class="versions"><h5>Versions</h5><div class="version-list"></div></div>
+					</div>
+				</div>
+			</div>
+			<div class="section">
+				<div class="header">
+					<a data-icon="A" data-action="test-code" class="fright button" title="Test that the code runs correctly on modelRxiv">Test</a><a data-icon="G" data-action="convert-code" class="fright button" title="Use OpenAI models to make your code compatible with modelRxiv (this will attempt to convert your code to Python if it is not written in Python or JavaScript)">Convert</a>
+					<h3>Model code</h3>
+				</div>
+				<div class="content code">
+					<div class="editor tabbed-content" data-editor="code">
+						<div class="versions"><h5>Versions</h5><div class="version-list"></div></div>
+					</div>
+				</div>
+			</div>
+			<div class="save-form">
+				<a data-action="submit" class="button">Submit</a>
+			</div>
+		</div>
+	</div>
+</div>
+<footer>
+	<div class="wrap">
+		<div class="col">
+			<p><a href="/terms.html">Terms of use</a></p>
+			<p><a href="/privacy.html">Privacy policy</a></p>
+		</div>
+		<div class="col"></div>
+		<div class="col">
+			<p>Platform code licensed under <a href="/COPYING">AGPLv3</a>. Uploaded models are licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">CC BY 4.0</a> unless otherwise stated.</p>
+		</div>
+		<div class="clear"></div>
+	</div>
+</footer>
+<script src="/apc/init.js"></script>
+</body>
+</html>

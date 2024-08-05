@@ -1,243 +1,64 @@
+import {queryFromPath, generateID} from '/apc/common.js';
+import { getIDBObject, cacheString } from '/apc/cache.js';
+import { readForm } from '/apc/form.js';
+import { pollResult } from '/apc/jobs.js';
+import { parseModelScheme } from '/model.js';
 
-const parseJSON = (text, default_value={}) => {
-	try {
-		return JSON.parse(text);
-	} catch (e) {
-		return default_value;
-	}
-};
 const entries = input => Object.entries(input instanceof Map ? Object.fromEntries(input) : input);
 const keys = input => Object.keys(input instanceof Map ? Object.fromEntries(input) : input);
 
-const pubmedSearch = (query, limit = 5) => {
-	const params = new URLSearchParams({term: query, db: 'pubmed', retmode: 'json', retmax: limit});
-	return fetch(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?${params.toString()}`)
-		.catch(e => console.log(e))
-		.then(res => res.json()).then(res => {
-			if (res === null || res.esearchresult.ERROR !== undefined)
-				return [];
-			const uids = res.esearchresult.idlist;
-			const params = new URLSearchParams({db: 'pubmed', retmode: 'json', 'id': uids.join(',')});
-			return fetch(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?${params.toString()}`).then(res => res.json()).then(res => {
-				if (res === null || res.error !== undefined)
-					return [];
-				return Object.keys(res.result).filter(key => key !== 'uids').map(key => res.result[key]);
-			});
-		});
+const getCredentials = async (property) => {
+	const credentials = await getIDBObject('apc', 'auth', 'credentials');
+	return credentials[property];
 };
 
-const search = async (field, query) => {
-	const data = await pubmedSearch(query);
-	const results = document.createElement('div');
-	results.classList.add('search-results');
-	results.innerHTML = data.map(item => `<div class="result"><a data-doi="${item.articleids.filter(id => id.idtype === 'doi').map(id => id.value).join(',')}" data-title="${item.title}" data-authors="${item.authors.map(author => author.name).join(', ')}" data-date="${item.pubdate}">${item.title}</a><div class="authors">${item.authors.map(author => author.name).join(', ')}</div><div class="meta"><span class="journal">${item.fulljournalname}</span> <span class="date">${item.pubdate}</span></div></div>`).join('');
-	results.style.width = field.offsetWidth + 'px';
-	results.style.left = field.offsetLeft + 'px';
-	field.parentElement.appendChild(results);
-	window.addEventListener('click', e => {
-		if (!e.target.closest('.search-results'))
-			results.remove();
-	});
-};
-
-const emception = async (code) => {
-	const comlink = await import('/comlink.js');
-	const { EmceptionWorker } = await import('/emception.worker.js');
-	const emception = comlink.wrap(new EmceptionWorker());
-	const compilation_flags = '';
-	try {
-		await emception.fileSystem.writeFile("/working/main.cpp", code);
-		const cmd = `em++ ${flags} -sSINGLE_FILE=1 -sMINIFY_HTML=0 -sUSE_CLOSURE_COMPILER=0 main.cpp -o main.html`;
-		const result = await emception.run(cmd);
-		console.log(result);
-	} catch (e) {
-		console.log('Compilation error:', e);
-	}
-};
-
-const cloneEntry = (container, type, entry) => {
-	if (Array.from(container.querySelectorAll(`.entry[data-entry="${type}"] [name="name"]`)).filter(item => item.value === entry.name).length > 0)
-		return;
-	const empty = container.querySelector(`[data-entry="${type}"]:last-child`);
-	const cloned = empty.cloneNode(true);
-	cloned.querySelectorAll('input').forEach(item => item.value = '');
-	for (const prop in entry)
-		cloned.querySelector(`[name="${prop}"]`) ? cloned.querySelector(`[name="${prop}"]`).value = entry[prop] : 0;
-	cloned.querySelectorAll('select').forEach(elem => elem.dispatchEvent(new Event('change')));
-	empty.parentElement.insertBefore(cloned, empty);
-};
-
-const populateForm = (form, data) => {
-	Object.entries(data).forEach(([name, value]) => {
-		if (value instanceof Array) {
-			value.forEach(entry => { // TODO: combine with cloneEntry
-				if (Array.from(form.querySelectorAll(`[data-entry="${name}"]>[name="name"]`)).filter(item => item.value === entry.name).length > 0)
-					return;
-				const empty = form.querySelector(`[data-entry="${name}"]:last-child`);
-				const cloned = empty.cloneNode(true);
-				cloned.querySelectorAll('input').forEach(item => item.value = '');
-				empty.parentElement.insertBefore(cloned, empty);
-				populateForm(cloned, entry);
-			});
-		} else {
-			Array.from(form.querySelectorAll(`[name=${name}]`)).filter(item => item.closest('.form, .entry') === form).forEach(item => {
-				item.value = value;
-				if (item.matches('select'))
-					item.dispatchEvent(new Event('change'));
-			});
-		}
-	});
-};
-
-const pollS3 = async (url, retry_limit=20, increment=5) => {
-	let retries = 0;
-	while (++retries <= retry_limit) {
-		await new Promise(resolve => setTimeout(resolve, increment * retries * 1000));
-		try {
-			const response = await fetch(url, {cache: 'no-cache', headers: {'Cache-Control': 'no-cache'}});
-			if (!response.ok)
-				throw 'Request failed';
-			return response;
-		} catch (e) {
-			// Depending on fetch error, maybe stop polling
-		}
-	}
-	throw 'Failed to load S3 object';
-};
-
-const queryGPT = async (form, code, options, autotest=true) => {
+const queryGPT = async (form, request_type, scheme, code, code_error='', autotest=false) => {
 	const request_id = Math.round(Math.random() * 1e6);
-	const request = await fetch(`https://d.modelrxiv.org/import`, {method: 'post', headers: {Authorization: `Basic ${getCredentials('token')}`, 'Content-Type': 'application/json'}, body: JSON.stringify(Object.assign({code, request_id}, options))}).then(res => res.json()).catch(e => ({error: e}));
-	const tab = document.createElement('div');
-	tab.dataset.tab = `tab_${request_id}`;
-	tab.dataset.status = `edited`;
-	tab.innerHTML = 'GPT Result <a data-icon="x" data-action="close"></a>';
-	form.querySelector('.editor .tabs').appendChild(tab);
-	const tab_content = document.createElement('div');
-	form.querySelector('.editor').appendChild(tab_content);
-	tab_content.classList.add('code', 'gpt');
-	tab_content.dataset.tabContent = `tab_${request_id}`;
-	tab_content.dataset.status = 'edited';
-	tab_content.innerHTML = `<textarea name="code" class="loading">Waiting for GPT response</textarea>`;
-	form.querySelector(`.editor .tabs [data-tab="tab_${request_id}"]`).dispatchEvent(new Event('click'));
-	const t = setInterval(() => tab_content.querySelector('textarea.loading').value = tab_content.querySelector('textarea.loading').value + '.', 1000);
+	const request = await fetch(`https://d.modelrxiv.org/import`, {method: 'post', headers: {Authorization: `Basic ${await getCredentials('token')}`, 'Content-Type': 'application/json'}, body: JSON.stringify({request_id, request_type, scheme, code, code_error})}).then(res => res.json()).catch(e => ({error: e}));
 	try {
-		const result = await pollS3(signedURL(`/users/${getCredentials('user_id')}/resources/${request_id}`), 10, 6).then(res => res.text());
-		clearTimeout(t);
-		const code_part = result.match(/[\`]{3}[a-zA-Z0-9]+\n(.*?)[\`]{3}/s) || ['', ''];
-		const text_part = result.replace(/[\`]{3}.*?[\`]{3}/s, '');
-		tab_content.innerHTML = `<textarea name="code">${code_part[1]}</textarea><div class="comment">${text_part}</div>`;
+		const result = await pollResult(`/user/resources/${request_id}`).then(res => res.text());
+		const code_part = result.match(/[\`]{3}([a-zA-Z0-9]+\n|)(.*?)[\`]{3}/s) || ['', '', ''];
+		const text_part = result.replace(/[\`]{3}.*?[\`]{3}/gs, '');
+		addCodeBox(form, generateID(6), 'OpenAI Response', code_part[2], text_part);
 		if (autotest)
 			document.querySelector('[data-action="test-code"]').click();
 	} catch (e) {
-		clearTimeout(t);
-		tab_content.querySelector('textarea.loading').value = 'Failed to load result';
 		console.log(e);
 	}
 };
 
-const hooks = (env, entry, query, elem) => [
-	['[data-module="submit"]', 'update', e => {
-		const data = readForm(elem.querySelector('.submission-form'));
-		const previous = parseJSON(localStorage.getItem('mdx_submit_form'), {}) || {};
-		const changed = Object.keys(data).filter(key => JSON.stringify(data[key]) !== JSON.stringify(previous[key]));
-		const previous_changed = parseJSON(localStorage.getItem('mdx_submit_changes'), []) || [];
-		localStorage.setItem('mdx_submit_form', JSON.stringify(data));
-		localStorage.setItem('mdx_submit_changes', JSON.stringify(Array.from(previous_changed.concat(changed))));
-	}],
-	['[data-module="submit"]', 'init', async e => {
-		if (entry) {
-			const module_url = signedURL(`/users/${getCredentials('user_id')}/${entry.model_id}.${entry.framework}`, query.version ? {versionId: query.version} : {});
-			entry.code = await fetch(module_url, {cache: 'reload'}).then(res => res.text());
-			elem.querySelector('.actions').innerHTML = `<a class="button" href="/sandbox/${entry.model_id}">Back</a><a class="button" data-action="delete">Delete</a>`;
-			populateForm(elem.querySelector('.submission-form'), entry);
-			localStorage.setItem('mdx_submit_form', JSON.stringify(entry));
-		} else {
-			try {
-				const data = JSON.parse(localStorage.getItem('mdx_submit_form'));
-				populateForm(elem.querySelector('.submission-form'), data);
-			} catch (e) {
-				//localStorage.setItem('mdx_submit_form', '');
-			}
-		}
-	}],
+const hooks = (query, scheme, elem, timeouts) => [
 	['.editor [data-tab]', 'click', e => {
 		const editor = e.target.closest('.editor');
 		editor.querySelectorAll('[data-tab]').forEach(elem => elem.classList.remove('selected'));
 		e.target.classList.add('selected');
-		editor.querySelectorAll('[data-tab-content]').forEach(elem => elem.classList.remove('show'));
-		editor.querySelector(`[data-tab-content="${e.target.dataset.tab}"]`).classList.add('show');
-	}],
-	['[data-action="publish"]', 'click', async e => {
-		const form = e.target.closest('.form');
-		const form_data = readForm(form, {lastUpdated: new Date().getTime()});
-		const res = await fetch(`https://d.modelrxiv.org/submit`, {method: 'POST', headers: {Authorization: `Basic ${getCredentials('token')}`}, body: JSON.stringify({action: 'review', form: Object.assign(form_data, {model_id: entry?.model_id || false})})}).then(res => res.json());
-		localStorage.removeItem('mdx_submit_form');
-		localStorage.removeItem('mdx_submit_changes');
-		document.querySelector('.main').dispatchEvent(new Event('refresh'));
-		document.querySelector('.main').dispatchEvent(new CustomEvent('navigate', {detail: {url: `/sandbox/${res.id}`}})); // Should redirect to main if only publishing
+		editor.querySelectorAll('[data-tab-content]').forEach(elem => elem.classList.remove('selected'));
+		editor.querySelector(`[data-tab-content="${e.target.dataset.tab}"]`).classList.add('selected');
 	}],
 	['[data-action="submit"]', 'click', async e => {
 		const form = e.target.closest('.form');
-		const form_data = readForm(form, {lastUpdated: new Date().getTime()});
-		const res = await fetch(`https://d.modelrxiv.org/submit`, {method: 'POST', headers: {Authorization: `Basic ${getCredentials('token')}`}, body: JSON.stringify({action: 'upload', form: Object.assign(form_data, {model_id: entry?.model_id || false})})}).then(res => res.json());
-		localStorage.removeItem('mdx_submit_form');
-		localStorage.removeItem('mdx_submit_changes'); // TODO: upload only changed parts
-		document.querySelector('.main').dispatchEvent(new Event('refresh'));
-		document.querySelector('.main').dispatchEvent(new CustomEvent('navigate', {detail: {url: `/sandbox/${res.id}`}}));
+		const form_data = {
+			model_id: query.edit || false,
+			scheme: form.querySelector('.scheme [data-tab-content].selected textarea').value,
+			code: form.querySelector('.code [data-tab-content].selected textarea').value
+		};
+		const res = await fetch(`https://d.modelrxiv.org/submit_beta`, {method: 'POST', headers: {Authorization: `Basic ${await getCredentials('token')}`}, body: JSON.stringify({action: 'upload', form: form_data})}).then(res => res.json());
+		console.log(res);
+		window.location.href = `/sandbox/${query.edit || res.model_id}`;
 	}],
 	['[data-action="delete"]', 'click', async e => {
-		if (!entry.model_id)
+		if (!query.edit)
 			return;
-		const res = await fetch(`https://d.modelrxiv.org/submit`, {method: 'POST', headers: {Authorization: `Basic ${getCredentials('token')}`}, body: JSON.stringify({action: 'delete', model_id: entry.model_id, framework: entry.framework})}).then(res => res.json());
-		document.querySelector('.main').dispatchEvent(new Event('refresh'));
-		document.querySelector('.main').dispatchEvent(new CustomEvent('navigate', {detail: {url: `/`}}));
+		const framework = scheme.framework;
+		const res = await fetch(`https://d.modelrxiv.org/submit_beta`, {method: 'POST', headers: {Authorization: `Basic ${await getCredentials('token')}`}, body: JSON.stringify({action: 'delete', model_id: query.edit, framework})}).then(res => res.json());
+		window.location.href = `/`;
 	}],
-	['.section h3', 'click', e => {
-		e.target.closest('.section').classList.toggle('hidden');
-	}],
-	['.entry [data-action="remove"]', 'click', e => {
-		e.target.closest('.entry').remove();
-		elem.dispatchEvent(new Event('update'));
-	}],
-	['.entry [data-action="duplicate"]', 'click', e => {
-		const empty = e.target.closest('.entry');
-		const cloned = empty.cloneNode(true);
-		if (empty.nextSibling)
-			empty.parentElement.insertBefore(cloned, empty.nextSibling);
-		else
-			empty.parentElement.appendChild(cloned);
-	}],
-	['.toggle-values', 'click', e => {
-		e.target.nextSibling.classList.toggle('hidden');
-	}],
-	['[name="type"]', 'change', e => {
-		const entry = e.target.closest('.entry');
-		if (!entry)
-			return;
-		const type = e.target.value;
-		entry.querySelectorAll('[data-range]').forEach(item => item.style.display = 'none');
-		entry.querySelector(`[data-range*="${type}"]`).style.display = 'block';
-	}],
-	['[data-action="builder"]', 'click', e => {
-		const form = e.target.closest('.form');
-		e.target.classList.add('disabled');
-		form.querySelectorAll('[data-action="source"]').forEach(elem => elem.classList.remove('disabled'));
-		form.querySelector('.editor.code').classList.add('hide');
-		form.querySelector('.editor.builder').classList.remove('hide');
-	}],
-	['[data-action="source"]', 'click', e => {
-		const form = e.target.closest('.form');
-		e.target.classList.add('disabled');
-		form.querySelectorAll('[data-action="builder"]').forEach(elem => elem.classList.remove('disabled'));
-		form.querySelector('.editor.code').classList.remove('hide');
-		form.querySelector('.editor.builder').classList.add('hide');
-	}],
-	['[data-tab] [data-action="close"]', 'click', e => {
-		const tab = e.target.closest('[data-tab]');
-		const tab_name = tab.dataset.tab;
-		tab.remove();
-		elem.querySelector(`[data-tab-content="${tab_name}"]`).remove(); // Don't use "elem"
+	['.version-list [data-version]:not([data-tab])', 'click', async e => {
+		const editor = e.target.closest('[data-editor]');
+		const version_id = e.target.dataset.version;
+		const framework = scheme.framework || 'py';
+		const tab_content = editor.dataset.editor === 'scheme' ? await fetch(`/user/${scheme.model_id}.txt?versionId=${version_id}`, {cache: 'reload'}).then(res => res.text()) : await fetch(`/user/${scheme.model_id}.${framework}?versionId=${version_id}`, {cache: 'reload'}).then(res => res.text());
+		addCodeBox(editor, generateID(6), `Version from ${e.target.innerText}`, tab_content, '', e.target);
 	}],
 	['.editor textarea', 'keydown', e => {
 		if (e.keyCode !== 9)
@@ -257,102 +78,127 @@ const hooks = (env, entry, query, elem) => [
 			e.target.selectionStart = e.target.selectionEnd = ss + 1;
 		}
 	}],
-	['[data-action="compile-code"]', 'click', async e => {
-		const form = e.target.closest('.form');
-		const code = form.querySelector('.code.show [name="code"]').value;
-		await emception(code);
-	}],
-	// Note that on refresh only the last tab is saved in model editor...
-	['[data-action="import-code"]', 'click', async e => {
-		const form = e.target.closest('.form');
-		const prompt = form.querySelector('.code.show [name="code"]').value;
-		const framework = form.querySelector('[name="framework"]').value || 'python';
-		queryGPT(form, prompt, {framework});
-	}],
-	['[data-action="test-code"]', 'click', async e => { // TODO: move to function
-		const form = e.target.closest('.form');
-		const framework = form.querySelector('[name="framework"]').value;
-		const tab = form.querySelector('.code.show').dataset.tabContent;
-		const gpt = form.querySelector('.code.show').classList.contains('gpt');
-		const code = form.querySelector('.code.show [name="code"]').value;
-		if (framework === '' || code === '')
+	['[data-action="generate-scheme"]', 'click', async e => {
+		if (e.target.classList.contains('loading'))
 			return;
-		const key = await fetch(`https://d.modelrxiv.org/submit`, {method: 'POST', headers: {Authorization: `Basic ${getCredentials('token')}`}, body: JSON.stringify({action: 'sandbox', framework, code})}).then(res => res.json()).then(json => json.key);
-		new Promise(resolve => {
-			const request = {
-				id: 'sandbox',
-				name: 'Sandbox',
-				framework,
-				sources: [
-					{type: 'script', private: true, model_id: 'sandbox', framework}
-				],
-				fixed_params: {test: 1},
-				variable_params: [{}],
-				resolve
-			};
-			document.querySelector('.apocentric').dispatchEvent(new CustomEvent('distribute', {detail: request}));
-		}).then(([result]) => {
-			const comment_box = elem.querySelector('.editor .code.show .comment');
-			const error_box = document.createElement('div');
-			comment_box.appendChild(error_box);
-			error_box.classList.add('show');
-			if (result.error) {
-				form.querySelectorAll(`.editor [data-tab="${tab}"], .editor [data-tab-content="${tab}"]`).forEach(elem => elem.dataset.status = 'test-fail');
-				if (gpt)
-					queryGPT(form, code, {framework, error: result.error.toString()});
-				return error_box.innerHTML = result.error;
-			}
-			error_box.innerHTML = 'Model code ran successfully';
-			error_box.classList.add('green');
-			form.querySelectorAll(`.editor [data-tab="${tab}"], .editor [data-tab-content="${tab}"]`).forEach(elem => elem.dataset.status = 'test-success');
-			for (const entry_type in result)
-				entries(result[entry_type]).forEach(([name, value]) => cloneEntry(elem, entry_type, {name, label: name, units: name, default_value: value, type: isNaN(value) ? 'disc' : 'cont'})); // .filter(item => item.closest('.form, .entry') === form)
-			Array.from(elem.querySelectorAll('[data-entry]')).forEach(item => {
-			const name = item.querySelector('[name="name"]').value;
-				if (name !== '' && result[item.dataset.entry] && !keys(result[item.dataset.entry]).includes(item.querySelector('[name="name"]').value)) {
-					item.classList.add('error');
-					const message = document.createElement('div');
-					message.innerHTML = `Parameter '${name}' not found in model`;
-					form.querySelectorAll(`.editor [data-tab="${tab}"], .editor [data-tab-content="${tab}"]`).forEach(elem => elem.dataset.status = 'test-fail');
-					error_box.classList.remove('green');
-					error_box.appendChild(message);
-				}
-			});
-			elem.dispatchEvent(new Event('update'));
-		});
-	}],
-	['[data-action="clear-form"]', 'click', e => {
-		localStorage.removeItem('mdx_submit_form');
-		document.querySelector('.main').dispatchEvent(new CustomEvent('navigate', {detail: {url: '/submit'}})); // Not the best solution, should be something internal
-	}],
-	['.search-button', 'click', e => {
-		const field = elem.querySelector('[name="title"]');
-		const query = field.value;
-		e.target.parentElement.querySelectorAll('.search-results').forEach(item => item.remove());
-		search(field, query);
-	}],
-	['.search-results [data-doi]', 'click', e => {
+		e.target.classList.add('loading');
 		const form = e.target.closest('.form');
-		const results = e.target.closest('.search-results');
-		const data = Object.assign({}, e.target.dataset);
-		Object.keys(data).forEach(key => form.querySelectorAll(`[name="${key}"]`).forEach(item => item.value = data[key]));
-		elem.dispatchEvent(new Event('update'));
-		results.remove();
+		const scheme = form.querySelector('.scheme [data-tab-content].selected textarea').value;
+		const code = form.querySelector('.code [data-tab-content].selected textarea').value;
+		const code_error = form.querySelector('.code [data-tab-content].selected pre.error')?.innerText || '';
+		await queryGPT(form.querySelector('[data-editor="scheme"]'), 'scheme', scheme, code, code_error);
+		e.target.classList.remove('loading');
 	}],
-	['.submission-form input, .submission-form textarea', 'input', e => {
-		if (env.timeouts.submit_save)
-			clearTimeout(env.timeouts.submit_save);
-		env.timeouts.submit_save = setTimeout(async () => {
-			elem.dispatchEvent(new Event('update'));
-		}, 1000);
+	['[data-action="convert-code"]', 'click', async e => {
+		if (e.target.classList.contains('loading'))
+			return;
+		e.target.classList.add('loading');
+		const form = e.target.closest('.form');
+		const scheme = form.querySelector('.scheme [data-tab-content].selected textarea').value;
+		const code = form.querySelector('.code [data-tab-content].selected textarea').value;
+		const code_error = form.querySelector('.code [data-tab-content].selected pre.error')?.innerText || '';
+		await queryGPT(form.querySelector('[data-editor="code"]'), 'code', scheme, code, code_error);
+		e.target.classList.remove('loading');
+	}],
+	['[data-action="test-code"]', 'click', async e => {
+		const form = e.target.closest('.form');
+		const scheme = form.querySelector('.scheme [data-tab-content].selected textarea').value;
+		const code = form.querySelector('.code [data-tab-content].selected textarea').value;
+		if (code === '')
+			return;
+		const test_id = generateID(10);
+		await cacheString(`/models/${test_id}.txt`, scheme);
+		await cacheString(`/models/${test_id}.${scheme.framework || 'py'}`, code);
+		const model_elem = document.createElement('div');
+		model_elem.dataset.module = 'model';
+		model_elem.classList.add('test-overlay');
+		model_elem.innerHTML = `<div class="plots"></div>`;
+		form.appendChild(model_elem);
+		try {
+			await import('/model.js').then(module => module.init(model_elem, `/model/${test_id}`));
+			model_elem.dispatchEvent(new Event('run'));
+			await new Promise((resolve, reject) => {
+				model_elem.addEventListener('complete', resolve);
+				model_elem.addEventListener('error', e => reject(e.detail.error));
+			});
+			form.querySelectorAll(`.editor [data-tab].selected, .editor [data-tab-content].selected`).forEach(elem => elem.dataset.status = 'success');
+			model_elem.remove();
+		} catch (e) {
+			console.log(e);
+			const comment_box = form.querySelector('.code [data-tab-content].selected .comment');
+			const error_elem = document.createElement('pre');
+			error_elem.classList.add('error');
+			error_elem.innerText = e.message;
+			comment_box.appendChild(error_elem);
+			form.querySelectorAll(`.editor [data-tab].selected, .editor [data-tab-content].selected`).forEach(elem => elem.dataset.status = 'error');
+			model_elem.remove();
+		}
 	}],
 ];
 
-export const submit = (env, {entry, query}, elem, storage={}) => ({
-	render: async () => {
-		elem.innerHTML = await fetch('/pages/submit').then(res => res.text());
-		elem.dispatchEvent(new Event('init'));
-		elem.dispatchEvent(new Event('done'));
-	},
-	hooks: hooks(env, entry, query, elem)
-});
+const addCodeBox = async (container, name, label, data, comment='', use_tab=undefined, position='before') => {
+	if (data)
+		await getIDBObject('mdx', 'tabs', name, data);
+	const code = await getIDBObject('mdx', 'tabs', name);
+	const code_box = document.createElement('div');
+	code_box.dataset.tabContent = name;
+	code_box.innerHTML = `<div class="header">${label}</div><textarea name="code">${code}</textarea><div class="comment">${comment}</div>`;
+	if (position === 'before') {
+		container.querySelectorAll('.code.selected').forEach(elem => elem.classList.remove('selected'));
+		code_box.classList.add('code', 'selected');
+	} else {
+		code_box.classList.add('code');
+	}
+	container.appendChild(code_box);
+	if (use_tab) {
+		use_tab.dataset.tab = name;
+		use_tab.click();
+	} else {
+		const tab = document.createElement('a');
+		tab.dataset.tab = name;
+		tab.innerText = label;
+		if (position === 'before') {
+			container.querySelectorAll('.version-list .selected').forEach(elem => elem.classList.remove('selected'));
+			tab.classList.add('selected');
+			container.querySelector('.version-list').insertBefore(tab, container.querySelector('.version-list [data-tab]:first-child'));
+		} else
+			container.querySelector('.version-list').appendChild(tab);
+	}
+	code_box.querySelector('textarea').addEventListener('change', e => {
+		getIDBObject('mdx', 'tabs', name, e.target.value);
+	});
+};
+
+export const init = async (elem) => {
+	const query = queryFromPath(window.location.pathname);
+	const model_id = query.edit;
+	const scheme_text = model_id ? await fetch(`/user/${model_id}.txt`, {cache: 'reload'}).then(res => res.text()) : '';
+	const scheme = model_id ? parseModelScheme(model_id, scheme_text) : {};
+	if (model_id) {
+		elem.querySelector('.upload-model-title').innerHTML = `<a class="fright" href="/sandbox/${model_id}">Back</a>Editing sandbox model`;
+		const framework = scheme.framework || 'py';
+		const code = await fetch(`/user/${model_id}.${framework}`, {cache: 'reload'}).then(res => res.text());
+		await addCodeBox(document.querySelector('[data-editor="scheme"]'), generateID(6), 'Current version', scheme_text);
+		await addCodeBox(document.querySelector('[data-editor="code"]'), generateID(6), 'Current version', code);
+		const versions = await fetch(`https://d.modelrxiv.org/submit_beta?action=versions&model_id=${model_id}&framework=${framework}`, {method: 'get', headers: {Authorization: `Basic ${await getCredentials('token')}`, 'Content-Type': 'application/json'}}).then(res => res.json());
+		versions['scheme_versions'].forEach(version => {
+			const tab = document.createElement('a');
+			tab.dataset.version = version.version;
+			tab.innerText = version.date;
+			document.querySelector('.scheme .version-list').appendChild(tab);
+		});
+		versions['model_versions'].forEach(version => {
+			const tab = document.createElement('a');
+			tab.dataset.version = version.version;
+			tab.innerText = version.date;
+			document.querySelector('.code .version-list').appendChild(tab);
+		});
+	} else {
+		const example_scheme = await fetch('/pages/example_scheme.txt', {cache: 'reload'}).then(res => res.text());
+		addCodeBox(document.querySelector('[data-editor="scheme"]'), generateID(6), 'Template', example_scheme);
+		const example_model = await fetch('/pages/example_model.txt', {cache: 'reload'}).then(res => res.text());
+		addCodeBox(document.querySelector('[data-editor="code"]'), generateID(6), 'Template', example_model);
+	}
+	const timeouts = {};
+	addHooks(elem, hooks(query, scheme, elem, timeouts));
+};

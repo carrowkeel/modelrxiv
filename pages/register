@@ -1,9 +1,0 @@
-<div class="center">
-<h2>Register</h2>
-<div class="form login-form">
-<p><label>Nickname</label><input type="text" name="user_name" placeholder="Nickname"></p>
-<p><label>Password</label><input type="password" name="user_password" placeholder="Password"></p>
-<p><label>Repeat password</label><input type="password" name="validate_password" placeholder="Repeat password"></p>
-<p><a class="fright button register-button">Register</a></p>
-</div>
-</div>

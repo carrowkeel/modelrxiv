@@ -1,0 +1,55 @@
+To integrate a model with modelRxiv, we need a scheme file that describes the model, its parameters and plots of the model dynamics that will be generated. We can infer some of these attributes from the model code, looking at the parameters used (in `params`) and also at the dictionary that is returned by the step function. For instance, in the example below, we see that the parameters `s`, `h` and `q0` are used, while `q` is returned by the step function, allowing us to track `q` over time. We can also provide the user some examples of "presets" which are parameter combinations that give specific outcomes or dynamics.
+
+```python
+def step(params: dict, last_step: dict, t: int) -> dict: ## Contains the main model logic
+    ## Compute the next step given the last step and the model parameters
+    ## For example, return the next step of a population genetics model
+    if t == 0: ## When called the first time, return the initial step
+        return {'q': params['q0']}
+    q = last_step['q']
+    s = params['s']
+    h = params['h']
+    q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2)
+    return {'q': q_prime}
+```
+
+An example scheme file we can write for this model is (the description part can be more elaborate):
+
+```text
+# Metadata
+title=Population genetics model
+description=The model tracks the frequency on an allele over time as it changes owing to selection
+authors=The authors
+doi=
+type=unpublished
+publication_date=draft
+keywords=population-genetics
+framework=py
+
+# Parameter: s
+name=s
+description=Fitness cost of the allele
+value=0.5
+
+# Parameter: h
+name=h
+description=Dominance of the allele over the wild type allele
+value=1
+
+# Parameter: q_0
+name=q0
+description=Initial frequency of the allele
+
+# Plot: Allele frequency
+type=line
+xlabel=Generations
+ylabel=Frequency
+x=t
+y=q
+
+# Preset: Fig. 1, Negative selection
+s=0.1
+
+# Preset: Fig. 1, Positive selection
+s=-0.1
+```
