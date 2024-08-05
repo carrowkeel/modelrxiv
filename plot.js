@@ -101,6 +101,7 @@ const plot_types = [
 		label: 'Scatter plot (RT)',
 		input: {x: ['cont'], y: ['cont']},
 		draw: (draw, data, x, r=5, opacity=0.5) => {
+			console.log(data);
 			Object.keys(data[data.length - 1]).forEach(group => data[data.length - 1][group].forEach(point => draw.point(point, group, r, point[2] !== undefined ? point[2] : opacity)));
 		}
 	},

@@ -272,7 +272,7 @@ const auth = (env, login={}) => {
 };
 
 export const modelrxiv = async () => {
-	const env = {db: staticDB({uri: 'https://modelrxiv.org'}), processes: {}, timeouts: {}};
+	const env = {db: staticDB({uri: 'https://mdx1.modelrxiv.org'}), processes: {}, timeouts: {}};
 	addHooks(window, hooks(env));
 	await auth(env);
 	addModule(document.querySelector('.apocentric'), 'apc', {options: {getCredentials, worker_script: '/worker.js', url: 'wss://apc.modelrxiv.org', threads: navigator.hardwareConcurrency, frameworks: ['js', 'py']}}, true);
