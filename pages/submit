@@ -1,3 +1,4 @@
+
 <div class="fright actions"></div>
 <h2>Upload model</h2>
 <div class="submission-form form wide-form">
@@ -14,38 +15,45 @@
 </div>
 </div>
 <div class="section">
-<h3><a data-action="save-code" class="fright button orange">Save</a><a data-action="test-code" class="fright button orange">Test</a><select class="fright" name="framework"><option value="js">JavaScript</option><option value="py">Python 3</option><option value="R">R</option></select><a data-action="build-code" class="fright button orange disabled">Build</a>Script <span class="switch"><a data-action="builder">Builder</a> | <a data-action="source" class="disabled">Source</a></span></h3>
+<h3>Model code</h3>
 <div class="content">
-<div class="editor builder hide"><div class="error"></div><textarea name="pseudocode"></textarea></div>
-<div class="editor code"><div class="error"></div><textarea name="code"></textarea></div>
+<div class="editor">
+<div class="tabs">
+<select class="fright" name="framework"><option value="js">JavaScript</option><option value="node.js">JavaScript (Node.js)</option><option value="py">Python 3</option><option value="R">R</option></select><a data-action="test-code" class="fright">Test</a><a data-action="import-code" class="fright">Build</a><a data-action="compile-code" class="fright">Compile</a>
+<a data-tab="main" data-status="edited" class="selected">Main</a>
+</div>
+<div data-tab-content="main" class="code show" data-status="edited">
+<textarea name="code"></textarea><div class="comment"></div>
+</div>
+</div>
 </div>
 </div>
 <div class="section">
 <h3>Model parameters</h3>
 <div class="content">
 <p>Parameters displayed to the user that will be available in the model code</p>
-<div class="entry" data-entry="input_params"><input type="text" name="label" placeholder="Label"><input type="text" name="name" placeholder="Parameter name"><select name="type"><option value="cont">Continuous</option><option value="vector">Vector</option><option value="grid">Grid</option><option value="disc">Discrete</option></select><input type="text" name="description" placeholder="Description"><input type="text" name="default_value" placeholder="Default value"><span class="range"><input data-range="cont,vector,grid" type="text" name="range" placeholder="Range (default 0-1)"><span data-range="disc"><a class="toggle-values">Values</a><div class="values hidden"><div class="entry" data-entry="values"><input type="text" name="name" placeholder="Name"><input type="text" name="value" placeholder="Value"><input type="text" name="color" placeholder="Color"><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div></div></span></span><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div>
+<div class="entry" data-entry="input_params"><input type="text" name="label" placeholder="Label" title="Parameter label"><input type="text" name="name" placeholder="Parameter name" title="Parameter name (in code)"><select name="type" title="Parameter type"><option value="cont">Continuous</option><option value="vector">Vector</option><option value="grid">Grid</option><option value="disc">Discrete</option></select><input type="text" name="description" placeholder="Description" title="Description of the parameter for users"><input type="text" name="default_value" placeholder="Default value" title="Default value of parameter"><span class="range"><input data-range="cont,vector,grid" type="text" name="range" placeholder="Range (default 0-1)" title="Range of values for meta-analyses"><span data-range="disc"><a class="toggle-values">Values</a><div class="values hidden"><div class="entry" data-entry="values"><input type="text" name="name" placeholder="Name" title="Value name"><input type="text" name="value" placeholder="Value" title="Value"><input type="text" name="color" placeholder="Color" title="Color"><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div></div></span></span><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div>
 </div>
 </div>
 <div class="section">
 <h3>Dynamics</h3>
 <div class="content">
 <p>Outputs of the model that describe the state of the model in each step, output either by the step function or at the completion of the model</p>
-<div class="entry" data-entry="dynamics_params"><input type="text" name="label" placeholder="Label"><input type="text" name="name" placeholder="Output name"><input type="text" name="units" placeholder="Units"><select name="type"><option value="cont">Continuous</option><option value="vector">Vector</option><option value="repeats">Repeats</option><option value="grid">Grid</option><option value="disc">Discrete</option></select><span class="range"><input data-range="cont,vector,repeats,grid" type="text" name="range" placeholder="Range (default 0-1)"><span data-range="disc"><a class="toggle-values">Values</a><div class="values hidden"><div class="entry" data-entry="values"><input type="text" name="name" placeholder="Name"><input type="text" name="value" placeholder="Value"><input type="text" name="color" placeholder="Color"><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div></div></span></span><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div>
+<div class="entry" data-entry="dynamics_params"><input type="text" name="label" placeholder="Label" title="Parameter label"><input type="text" name="name" placeholder="Output name" title="Output parameter name (in code)"><input type="text" name="units" placeholder="Units" title="Parameter units"><select name="type" title="Parameter type"><option value="cont">Continuous</option><option value="lines">Lines</option><option value="vector">Vector</option><option value="repeats">Repeats</option><option value="grid">Grid</option><option value="disc">Discrete</option><option value="image">Image</option></select><span class="range"><input data-range="cont,lines,vector,repeats,grid" type="text" name="range" placeholder="Range (default 0-1)" title="Range of values for plots"><span data-range="disc"><a class="toggle-values">Values</a><div class="values hidden"><div class="entry" data-entry="values"><input type="text" name="name" placeholder="Name" title="Value name"><input type="text" name="value" placeholder="Value" title="Value"><input type="text" name="color" placeholder="Color" title="Color"><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div></div></span></span><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div>
 </div>
 </div>
 <div class="section">
 <h3>Results</h3>
 <div class="content">
 <p>Outputs provided at the completion of the model that describe the outcome or score of the model</p>
-<div class="entry" data-entry="result_params"><input type="text" name="label" placeholder="Label"><input type="text" name="name" placeholder="Output name"><input type="text" name="units" placeholder="Units"><select name="type"><option value="cont">Continuous</option><option value="vector">Vector</option><option value="repeats">Repeats</option><option value="grid">Grid</option><option value="disc">Discrete</option></select><span class="range"><input data-range="cont,vector,repeats,grid" type="text" name="range" placeholder="Range (default 0-1)"><span data-range="disc"><a class="toggle-values">Values</a><div class="values hidden"><div class="entry" data-entry="values"><input type="text" name="name" placeholder="Name"><input type="text" name="value" placeholder="Value"><input type="text" name="color" placeholder="Color"><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div></div></span></span><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div>
+<div class="entry" data-entry="result_params"><input type="text" name="label" placeholder="Label" title="Parameter label"><input type="text" name="name" placeholder="Output name" title="Output parameter name (in code)"><input type="text" name="units" placeholder="Units" title="Parameter units"><select name="type" title="Parameter type"><option value="cont">Continuous</option><option value="vector">Vector</option><option value="repeats">Repeats</option><option value="grid">Grid</option><option value="disc">Discrete</option><option value="image">Image</option></select><span class="range"><input data-range="cont,vector,repeats,grid" type="text" name="range" placeholder="Range (default 0-1)" title="Range of values for plots"><span data-range="disc"><a class="toggle-values">Values</a><div class="values hidden"><div class="entry" data-entry="values"><input type="text" name="name" placeholder="Name" title="Value name"><input type="text" name="value" placeholder="Value" title="Value"><input type="text" name="color" placeholder="Color" title="Color"><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div></div></span></span><a data-action="duplicate" data-icon="+"></a><a data-action="remove" data-icon="x"></a></div>
 </div>
 </div>
-<div class="section hidden">
+<div class="section">
 <h3>Parameter presets</h3>
 <div class="content">
 <p>Parameter presets that are optionally related to figures</p>
-<div class="editor"><div class="error"></div><textarea name="presets"></textarea></div>
+<div class="editor"><div class="error"></div><textarea name="presets" placeholder="## Figure 1, title&#10;param_1=0.5&#10;param_2=2&#10&#10;## Figure 2, title&#10;param_1=[0,1]&#10;param_2=[1, 10]&#10;param_3=0"></textarea></div>
 </div>
 </div>
 <div class="controls">

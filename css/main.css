@@ -164,15 +164,15 @@ a.logo {
 .menu .tabs {
 	background: #eee;
 }
-.menu .tabs>a {
+.menu .tabs>[data-tab] {
 	padding: 3px 10px;
 	color: #555;
 	display: inline-block;
 }
-.menu .tabs>a.selected {
+.menu .tabs>[data-tab].selected {
 	background: #fff;
 }
-.menu [data-tab-content] {
+[data-tab-content] {
 	display: none;
 }
 [data-tab-content].show + [data-tab-content].show {
@@ -194,30 +194,47 @@ a.logo {
 	float: left;
 	margin-right: 4px;
 }
-.user-menu [data-type="node"] .name:before {
+.user-menu [data-connection_id] .name:before {
 	content: 'n';
 }
-.user-menu [data-type="node"][data-connection_id="local"] .name:before {
+.user-menu [data-connection_id="local"] .name:before {
 	content: 'L';
 }
-.user-menu [data-type="api"] .name:before {
-	content: 's';
+[data-module="resource"] {
+	border-left: 4px solid #eee;
+	border-bottom: 1px solid #fafafa;
 }
-.user-menu [data-framework] {
+[data-module="resource"][data-connection-state="0"] {
+	border-left-color: #daa;
+}
+[data-module="resource"][data-connection-state="1"] {
+	border-left-color: #aad;
+}
+[data-module="resource"][data-connection-state="2"] {
+	border-left-color: #dda;
+}
+[data-module="resource"][data-connection-state="3"] {
+	border-left-color: #ada;
+}
+[data-framework] {
 	padding: 2px 5px;
 	background: #eee;
 	margin-right: 4px;
 	color: #555;
 }
-.user-menu [data-framework="js"] {
+[data-framework="js"] {
 	background: #f7df1e;
 	color: #000;
 }
-.user-menu [data-framework="py"] {
+[data-framework="node.js"] {
+	background: #23a133;
+	color: #fff;
+}
+[data-framework="py"] {
 	background: #306998;
 	color: #fff;
 }
-.user-menu [data-framework="R"] {
+[data-framework="R"] {
 	color: #2468bb;
 }
 .user-menu .frameworks {
@@ -232,9 +249,6 @@ a.logo {
 	width: 30%;
 	color: #333;
 	line-height: 22px;
-}
-.resources .item.rtc {
-	background: rgba(0, 200, 0, 0.1);
 }
 [data-job] .progress {
 	float: left;
@@ -413,9 +427,28 @@ canvas.dynamic {
 	margin: 0;
 }
 .plots {
+	position: relative;
 	padding: 15px 0;
 	display: inline-block;
 	width: 100%;
+}
+.plots .overlay {
+	display: none;
+	position: absolute;
+	z-index: 1000;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	padding-top: 150px;
+	text-align: center;
+	font-size: 24px;
+}
+.plots.loading .group {
+	filter: blur(3px);
+}
+.plots.loading .overlay {
+	display: block;
 }
 .archived-plots {
 	padding: 15px 0;
@@ -475,6 +508,24 @@ polygon.proportion:hover {
 .plot .legend a:nth-child(4):before {
 	background: var(--color-cycle-4);
 }
+.plot .legend a:nth-child(5):before {
+	background: var(--color-cycle-5);
+}
+.plot .legend a:nth-child(6):before {
+	background: var(--color-cycle-6);
+}
+.plot .legend a:nth-child(7):before {
+	background: var(--color-cycle-7);
+}
+.plot .legend a:nth-child(8):before {
+	background: var(--color-cycle-8);
+}
+.plot .legend a:nth-child(9):before {
+	background: var(--color-cycle-9);
+}
+.plot .legend a:nth-child(10):before {
+	background: var(--color-cycle-10);
+}
 .plot:nth-child(1) [data-plot^="line"] polyline {
 	stroke: var(--color-cycle-1);
 }
@@ -487,6 +538,24 @@ polygon.proportion:hover {
 .plot:nth-child(4) [data-plot^="line"] polyline {
 	stroke: var(--color-cycle-4);
 }
+.plot:nth-child(5) [data-plot^="line"] polyline {
+	stroke: var(--color-cycle-5);
+}
+.plot:nth-child(6) [data-plot^="line"] polyline {
+	stroke: var(--color-cycle-6);
+}
+.plot:nth-child(7) [data-plot^="line"] polyline {
+	stroke: var(--color-cycle-7);
+}
+.plot:nth-child(8) [data-plot^="line"] polyline {
+	stroke: var(--color-cycle-8);
+}
+.plot:nth-child(9) [data-plot^="line"] polyline {
+	stroke: var(--color-cycle-9);
+}
+.plot:nth-child(10) [data-plot^="line"] polyline {
+	stroke: var(--color-cycle-10);
+}
 .plot:nth-child(1) [data-plot^="line"] polygon {
 	fill: var(--color-cycle-1);
 }
@@ -498,6 +567,24 @@ polygon.proportion:hover {
 }
 .plot:nth-child(4) [data-plot^="line"] polygon {
 	fill: var(--color-cycle-4);
+}
+.plot:nth-child(5) [data-plot^="line"] polygon {
+	fill: var(--color-cycle-5);
+}
+.plot:nth-child(6) [data-plot^="line"] polygon {
+	fill: var(--color-cycle-6);
+}
+.plot:nth-child(7) [data-plot^="line"] polygon {
+	fill: var(--color-cycle-7);
+}
+.plot:nth-child(8) [data-plot^="line"] polygon {
+	fill: var(--color-cycle-8);
+}
+.plot:nth-child(9) [data-plot^="line"] polygon {
+	fill: var(--color-cycle-9);
+}
+.plot:nth-child(10) [data-plot^="line"] polygon {
+	fill: var(--color-cycle-10);
 }
 .group.dragover {
 	background: #ffe99b;
@@ -540,25 +627,10 @@ polygon.proportion:hover {
 .plot .header {
 	height: 29px;
 }
-.plot .figure-selector {
-	position: absolute;
-	top: 0;
-	z-index: 50;
-	background: #fafafa;
-	white-space: nowrap;
-	height: 29px;
-	/*overflow-y: hidden;*/
-}
-.plot .figure-selector:hover {
-	height: auto;
-}
-.plot .header>a, .plot .figure-selector>a {
+.plot .header .title a {
 	font-size: 14px;
 	padding: 3px 0;
 	color: #333;
-}
-.plot .figure-selector>a {
-	display: block;
 }
 .plot .settings-menu a, .plot .data-menu a {
 	display: block;
@@ -732,7 +804,8 @@ polygon.proportion:hover {
 	border-bottom: 2px solid #ddd;
 	position: relative;
 }
-.tabs>a {
+.tabs>[data-tab], [data-module="model"] .tabs>a {
+	cursor: pointer;
 	display: inline-block;
 	font-size: 14px;
 	position: relative;
@@ -741,16 +814,25 @@ polygon.proportion:hover {
 	border-bottom: 2px solid #6dbbcd;
 	color: #555;
 }
-.tabs>a:hover {
+.tabs>[data-tab]:hover, [data-module="model"] .tabs>a:hover {
 	background: #eee;
 }
-.tabs>a.selected {
-	background: #eee;
-	border-bottom-color: #ddd;
+.tabs>[data-action] {
+	display: inline-block;
+	padding: 5px 10px;
 }
-.tabs>a[data-icon]:before {
+.menu .tabs>[data-tab].selected {
+	background: #ddd;
+	/* border-bottom-color: #ddd; */
+}
+.tabs>[data-tab][data-icon]:before, [data-module="model"] .tabs>a[data-action]:before {
 	margin-right: 4px;
 	font-size: 13px;
+}
+.tabs>[data-tab] [data-action="close"] {
+	color: #555;
+	font-size: 11px;
+	margin-left: 5px;
 }
 .result-tab {
 	right: 142px;
@@ -905,6 +987,10 @@ polygon.proportion:hover {
 	width: 25%;
 	padding-left: 5%;
 }
+.wide-form .tabs select {
+	width: 200px;
+	margin-left: 5px;
+}
 .entry {
 	display: flex;
 	padding: 5px 7px;
@@ -936,7 +1022,7 @@ polygon.proportion:hover {
 .entry .values {
 	position: absolute;
 	z-index: 100;
-	width: 100%;
+	width: 320px;
 	right: 0;
 	top: 29px;
 	display: flex;
@@ -1129,7 +1215,19 @@ h2 a.tag {
 [data-category="published"] {
 	background: #6885db;
 }
+.form .error {
+	padding: 10px 15px;
+	margin-bottom: 15px;
+	border: 1px solid #ba0000;
+	background: #ba000033;
+}
+.form .error:empty {
+	display: none;
+}
 .editor {
+	position: relative;
+}
+.editor .code {
 	position: relative;
 }
 .editor .error {
@@ -1151,12 +1249,26 @@ h2 a.tag {
 	width: 100%;
 	min-width: 100%;
 	max-width: 100%;
-	height: 250px;
+	height: 500px;
+	outline: none;
 	float: none;
-	font-size: 15px;
+	font-size: 14px;
 	font-family: monospace;
-	background: #eee;
+	vertical-align: top;
+	background: #fff;
 	padding: 5px;
+}
+.editor textarea[name="code_display"] {
+	line-height: 1.6;
+	height: 700px;
+}
+.editor .comment {
+	background: #f0f0f0;
+	padding: 5px 10px;
+	margin: 0;
+	border: 1px solid #ccc;
+	font-size: 14px;
+	border-top: 0;
 }
 .editor .watermark {
 	position: absolute;
@@ -1164,6 +1276,24 @@ h2 a.tag {
 	opacity: 0.5;
 	right: 10px;
 	font-size: 14px;
+}
+.editor .tabs>[data-tab] {
+	background: #fff;
+	padding: 4px 12px;
+	border-bottom-width: 4px;
+	top: 4px;
+}
+.editor .tabs>[data-tab].selected {
+	background: #f0f0f0;
+}
+.editor .tabs>[data-tab][data-status="test-success"] {
+	border-color: #00ba00;
+}
+.editor .tabs>[data-tab][data-status="test-fail"] {
+	border-color: #ba0000;
+}
+.editor .tabs {
+	border-bottom-width: 4px;
 }
 .toolbar {
 	display: none;

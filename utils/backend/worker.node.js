@@ -35,7 +35,7 @@ const test = async (step_module) => {
 };
 
 const processJob = async (request) => {
-	const step_module = await import(`./${request.script}`);
+	const step_module = require(`./${request.script}`);
 	switch(true) {
 		case request.fixed_params.test:
 			return test(step_module);

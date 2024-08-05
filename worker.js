@@ -22,33 +22,36 @@ const pythonModuleWrapper = async (module_url, reload=false) => ({
 	})(),
 	defaults: function () {
 		const code = `${this.module}
-result = defaults()
+output = defaults()
 `;
 		this.pyodide.runPython(code);
-		const outputPr = this.pyodide.globals.get('result');
+		const outputPr = this.pyodide.globals.get('output');
 		const result = outputPr.toJs();
 		outputPr.destroy();
 		return result instanceof Map ? Object.fromEntries(result) : result;
 	},
+	has_step: function() {
+		return this.module.match(/def step[ ]*\(/);
+	},
 	step: function (params, _step, t) {
 		const code = `${this.module}
-result = step(params, _step, ${t})
+output = step(params, _step, ${t})
 `;
 		this.pyodide.globals.set('params', this.pyodide.toPy(params));
 		this.pyodide.globals.set('_step', this.pyodide.toPy(_step));
 		this.pyodide.runPython(code);
-		const outputPr = this.pyodide.globals.get('result');
+		const outputPr = this.pyodide.globals.get('output');
 		const result = outputPr.toJs();
 		outputPr.destroy();
 		return result instanceof Map ? Object.fromEntries(result) : result;
 	},
 	run: function (params) {
 		const code = `${this.module}
-result = run(params)
+output = run(params)
 `;
 		this.pyodide.globals.set('params', this.pyodide.toPy(params));
 		this.pyodide.runPython(code);
-		const outputPr = this.pyodide.globals.get('result');
+		const outputPr = this.pyodide.globals.get('output');
 		const result = outputPr.toJs();
 		outputPr.destroy();
 		return result instanceof Map ? Object.fromEntries(result) : result;
@@ -59,7 +62,6 @@ const scriptWrapper = (script, framework) => {
 	switch(framework) {
 		case 'py':
 			return pythonModuleWrapper(script);
-		case 'js':
 		default:
 			return import(script);
 	}
@@ -95,7 +97,7 @@ const test = async (script, framework) => {
 	try {
 		const step_module = await scriptWrapper(script, framework);
 		const params = Object.assign({}, step_module.defaults());
-		return {input_params: params, dynamics_params: step_module.step ? step_module.step(step_module.defaults(), undefined, 0) : {}, result_params: step_module.run(step_module.defaults())};
+		return {input_params: params, dynamics_params: (step_module.has_step === undefined && step_module.step) || step_module.has_step() ? step_module.step(step_module.defaults(), undefined, 0) : {}, result_params: step_module.run(step_module.defaults())};
 	} catch (e) {
 		return {error: e};
 	}
@@ -105,9 +107,9 @@ self.addEventListener("message", async e => {
 	const request = e.data;
 	const script = scriptFromSources(request.sources, request.credentials);
 	switch(true) {
-		case request.fixed_params.test:
+		case request.fixed_params.test !== undefined:
 			return test(script, request.framework).then(result => self.postMessage({type: 'result', data: result}));
-		case request.variable_params === undefined:
+		case request.variable_params === undefined: // && ((step_module.has_step === undefined && step_module.step) || step_module.has_step()):
 			const dynamics_stream = await dynamicsStream(script, request.framework, request.fixed_params);
 			while(true) {
 				const step = await dynamics_stream.next();
@@ -116,6 +118,9 @@ self.addEventListener("message", async e => {
 				self.postMessage({type: 'dynamics', data: step.value});
 			}
 			return self.postMessage({type: 'result', data: {}}); // Deriving a result here depends on step_module.result
+		case request.variable_params === undefined:
+			const step_output = (step) => process.stdout.write(JSON.stringify({type: 'dynamics', data: step})+'\n');
+			return runParams(step_module, request.fixed_params, undefined, step_output);
 		default:
 			return runParams(script, request.framework, request.fixed_params, request.variable_params).then(result => self.postMessage({type: 'result', data: result}));
 	}

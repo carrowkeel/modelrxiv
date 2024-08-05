@@ -1,7 +1,7 @@
 
 const formatLabel = text => {
-	const label = text.replace(/(^|[^a-zA-Z])([a-zA-Z])(_|\^)(\{([^\{]+)\}|[a-zA-Z0-9])/, (_, pre, name, type, sub, sub_curly) => `${pre}${name}<${type === '_' ? 'sub' : 'sup'}>${sub_curly || sub}</${type === '_' ? 'sub' : 'sup'}>`);
-	return text.match(/^[a-zA-Z](_|$)/) ? `<i>${label}</i>` : label;
+	const label = text.replace(/(^|[^a-zA-Z])([^\s\p{P}])(_|\^)(\{([^\{]+)\}|[^\s\p{P}])/u, (_, pre, name, type, sub, sub_curly) => `${pre}${name}<${type === '_' ? 'sub' : 'sup'}>${sub_curly || sub}</${type === '_' ? 'sub' : 'sup'}>`);
+	return text.match(/^[^\s\p{P}](_|$)/u) ? `<i>${label}</i>` : label;
 };
 
 const fieldsFromForm = (input_params, query) => {
@@ -14,7 +14,7 @@ const fieldsFromForm = (input_params, query) => {
 				case 'cont':
 					return `<input type="text" data-type="${type}" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}"><input type="text" class="range" name="${name}" value="${range[0]}" title="${description} range start"><input type="text" class="range" name="${name}" value="${range[1]}" title="${description} range end"><input type="text" class="range" name="${name}" value="5" title="${description} resolution (2^x)">`;
 				case 'disc':
-					return values ? `<select class="value" data-type="cont" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">${values.map(flag => `<option value="${flag.name}">${flag.name}</option>`).join('')}</select>` : `<input type="text" data-type="${type}" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">`;
+					return values ? `<select class="value" data-type="cont" name="${name}" title="${description}">${values.map(flag => `<option value="${flag.name}"${(query && query[name] !== undefined ? query[name] : default_value) === flag.name ? 'selected' : ''}>${flag.name}</option>`).join('')}</select>` : `<input type="text" data-type="${type}" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">`;
 				case 'json':
 					return `<input type="text" data-type="json" class="value" name="${name}" value="${query && query[name] !== undefined ? query[name] : default_value}" title="${description}">`;
 			}
@@ -27,20 +27,23 @@ const draw = (container, data, offset=0, flush=false) => { // TODO: move preview
 	container.querySelectorAll(`[data-plot][data-name]`).forEach((plot,i) => data[0][plot.dataset.name] !== undefined ? plot.dispatchEvent(new CustomEvent('update', {detail: {data: data.map(step => step[plot.dataset.name]), offset, flush}})) : 0);
 };
 
-const pythonModuleWrapper = async (module, reload=false) => ({
+const pythonModuleWrapper = async (elem, module, reload=false) => ({
 	module: await fetch(module.module_url, {cache: reload ? 'no-cache' : 'default'}).then(res => res.text()),
 	pyodide: await (async () => {
 		try {
+			elem.dispatchEvent(new Event('loading'));
 			if (typeof loadPyodide !== 'function')
 				await loadScript('/pyodide/pyodide.js');
 			const pyodide = await loadPyodide({indexURL: 'https://modelrxiv.org/pyodide/'});
-			await pyodide.loadPackage('numpy'); // Fix
+			await pyodide.loadPackage('numpy');
 			if (module.modules) {
 				for (const module_name of module.modules.split(','))
 					await pyodide.loadPackage(module_name);
 			}
+			elem.dispatchEvent(new Event('loaded'));
 			return pyodide;
 		} catch (e) {
+			elem.dispatchEvent(new Event('loaded'));
 			return pyodide;
 			// Ignore "already loaded" error
 		}
@@ -82,7 +85,7 @@ const stepWrapper = (container, step_module, params, _step, storage=[]) => {
 		if (!step)
 			return complete(params, storage);
 		storage.push(step);
-		draw(plots_container, storage, 0, true); // storage.slice(storage.length - 2), storage.length - 2);
+		draw(plots_container, storage, 0, true);
 		return step;
 	}
 };
@@ -106,40 +109,6 @@ const parsePresets = (presetText) => {
 	if (cache.length > 0)
 		presets.push(formatPreset(cache));
 	return presets;
-};
-
-
-// TODO: move to plot module
-const groupPlots = (container) => {
-	const plots = Array.from(container.querySelectorAll('.plot:first-child:last-child [data-plot]')).map(plot => Object.assign({elem: plot.closest('.plot')}, plot.dataset, {labels: JSON.parse(plot.dataset.labels)}));
-	const grouped = plots.reduce((groups, plot) => {
-		const key = [plot.labels.x, plot.labels.y, plot.xbounds, plot.ybounds].join(',');
-		return Object.assign(groups, {[key]: groups[key] ? groups[key].concat(plot.elem) : [plot.elem]});
-	}, {});
-	for (const group of Object.values(grouped)) {
-		if (group.length < 2)
-			continue;
-		const target_group = group[0].closest('.group');
-		for (const plot of group.slice(1)) {
-			const source_group = plot.closest('.group');
-			target_group.appendChild(plot);
-			source_group.remove();
-		}
-		group.forEach(plot => plot.dispatchEvent(new Event('update')));
-	}
-};
-
-const plotsFromOutput = (model) => { // Should take model.dynamics_params not model
-	return model.dynamics_params.map(output => {
-		return {
-			name: output.name,
-			draw: output.type === 'grid' ? 'canvas' : 'svg',
-			type: output.type === 'grid' ? 'hist_2d' : (output.type === 'vector' ? 'scatter_rt' : (output.type === 'repeats' ? 'lines' : 'line_plot')), // TODO: function for mapping types to plots
-			xbounds: output.type === 'vector' || output.type === 'grid' ? (output.range ? output.range.split(',').map(v => !isNaN(v) ? +(v) : v) : [0, 1]) : [0, 'target_steps'],
-			ybounds: output.range ? output.range.split(',').map(v => !isNaN(v) ? +(v) : v) : [0, 1],
-			labels: {title: output.label, x: model.time || 'Steps', y: output.units || output.label}
-		};
-	});
 };
 
 const runGrid = (entry, form, defaults, plots_elem, title) => {
@@ -167,8 +136,8 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 				break;
 			default:
 				const option_fields = fieldsFromForm(input_params, query);
-				elem.innerHTML = `<h2>${entry.title}</h2><div class="authors">${entry.authors || ''}. ${entry.doi ? `<a href="https://doi.org/${entry.doi}" target="_blank">doi:${entry.doi}</a>` : ''}</div><div class="description shorten">${entry.description || ''}</div><div class="tabs"><div class="result-tab menu"></div><div class="parameters-menu menu show multiple-tabs"><div class="tabs"><a data-tab="parameters" class="selected">Parameters</a><a data-tab="presets">Presets</a><a data-tab="saved">Saved</a></div><div data-tab-content="parameters" class="form show">${option_fields}<div class="clear space"><a class="button" data-action="grid" title="Meta analysis using selected parameters">Grid</a><a data-action="update" class="button">Update</a><a data-action="save" class="button">Save</a><div class="clear"></div></div></div><div data-tab-content="presets">${presetHTML}</div><div data-tab-content="saved"></div></div><a class="fright" data-action="parameters-menu" title="Parameters" data-icon="f">Parameters</a><a class="fright" data-action="restart" title="Restart" data-icon="r">Restart</a><a class="fright" data-action="start" title="Start/Pause" data-icon="p">Run</a><a class="${!query.code && !query.pseudocode ? 'selected' : ''}" href="${uri}">Model</a>${entry.private ? `<a href="/edit/${entry.model_id}">Edit</a><a data-action="publish">Publish</a>` : ''}<a class="${query.code ? 'selected' : ''}" href="${uri}/code/latest">Code</a>${entry.pseudocode ? `<a class="${query.pseudocode ? 'selected' : ''}" href="${uri}/pseudocode/latest">Equations</a>` : ''}</div>${query.code || query.pseudocode ? '<div class="editor line-numbers"><div class="watermark">Powered by Prism.js</div><pre><code class="language-javascript"></code></pre></div>' : '<div class="plots" data-empty="Initiate model to load results"></div>'}`;
-				elem.dispatchEvent(new CustomEvent('init', {detail: {group: true}}));
+				elem.innerHTML = `<div class="fright"><div data-framework="${entry.framework}">.${entry.framework}</div></div><h2>${entry.title}</h2><div class="authors">${entry.authors || ''}. ${entry.doi ? `<a href="https://doi.org/${entry.doi}" target="_blank">doi:${entry.doi}</a>` : ''}</div><div class="description shorten">${entry.description || ''}</div><div class="tabs"><div class="result-tab menu"></div><div class="parameters-menu menu show"><div class="tabs"><a data-tab="parameters" class="${entry.private || presetHTML === '' ? 'selected' : ''}">Parameters</a><a data-tab="presets" class="${entry.private || presetHTML === '' ? '' : 'selected'}">Presets</a></div><div data-tab-content="presets" class="${entry.private || presetHTML === '' ? '' : 'show'}">${presetHTML}</div><div data-tab-content="parameters" class="form ${entry.private || presetHTML === '' ? 'show' : ''}">${option_fields}<div class="clear space"><a class="button" data-action="grid" title="Meta analysis using selected parameters">Grid</a><div class="clear"></div></div></div><div data-tab-content="saved"></div></div><a class="fright" data-action="parameters-menu" title="Edit the model parameters" data-icon="f">Parameters</a><a class="fright" data-action="restart" title="Restart the model" data-icon="r">Restart</a><a class="fright" data-action="start" title="Start/Pause the model" data-icon="p">Run</a><a class="${!query.code ? 'selected' : ''}" href="${uri}" title="Open the model analysis page">Model</a>${getCredentials().user_id ? (entry.private ? `<a href="/edit/${entry.model_id}" title="Edit the model code and parameters">Edit</a><a title="Make the model publicly available (subject to review)" data-action="publish">Publish</a>` : '<a title="Create a local copy of the model" data-action="copy">Copy</a>') : ''}<a class="${query.code ? 'selected' : ''}" href="${uri}/code/latest" title="View the model source code">Code</a></div>${query.code ? '<div class="editor"><textarea disabled="disabled" name="code_display"></textarea></div>' : '<div class="plots" data-empty="Initiate model to load results"></div>'}`;
+				await new Promise(resolve => elem.dispatchEvent(new CustomEvent('init', {detail: {group: true, resolve}})));
 				break;
 		}
 		elem.dispatchEvent(new Event('done'));
@@ -178,17 +147,10 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			switch(true) { // Move elsewhere
 				case query.code !== undefined:
 					const code = await fetch(entry.module_url, {cache: 'reload'}).then(res => res.text());
-					elem.querySelector('.editor code').innerHTML = code;
-					await loadScript('/ext/prism.js');
-					Prism.highlightElement(elem.querySelector('.editor code'));
-					break;
-				case query.pseudocode !== undefined:
-					elem.querySelector('.editor code').setAttribute('class', 'language-python');
-					elem.querySelector('.editor code').innerHTML = entry.pseudocode;
-					await loadScript('/ext/prism.js');
-					Prism.highlightElement(elem.querySelector('.editor code'));
+					elem.querySelector('.editor [name="code_display"]').value = code;
 					break;
 				case elem.querySelector('.plots') !== null:
+					const {plotsFromOutput, groupPlots} = await import('./plot.js');
 					const plots_container = elem.querySelector('.plots');
 					storage.params = numericize(readForm(elem.querySelector('.parameters-menu .form'), defaultsFromInput(entry.input_params)));
 					await Promise.all(plotsFromOutput(entry).map(plot => {
@@ -203,12 +165,43 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 					if (e.detail?.group)
 						groupPlots(plots_container);
 			}
+			if (e.detail?.resolve)
+				e.detail.resolve();
 		}],
+
+/*
+const stepWrapper = (container, step_module, params, _step, storage=[]) => {
+	const t = storage.length;
+	const plots_container = container.querySelector('.plots');
+	const complete = (params, storage) => { // TODO: decide how result is handled in dynamics mode
+		const result = step_module.result ? step_module.result(params, storage) : {};
+		container.querySelector('.result-tab').innerHTML = '<h4>Result</h4><pre>'+Object.entries(result).map(([param, value]) => `${param}: ${value}\n`).join('')+'</pre>';
+		//container.querySelector('.result-tab').classList.add('show');
+		setTimeout(() => {
+			container.querySelector('.result-tab').classList.remove('show');
+		}, 5000);
+		draw(plots_container, storage, 0, true);
+		return false;
+	};
+	if (t - 1 === parseInt(params.target_steps)) {
+		complete(params, storage);
+		return false;
+	} else {
+		const step = step_module.step(params, _step, t);
+		if (!step)
+			return complete(params, storage);
+		storage.push(step);
+		draw(plots_container, storage, 0, true);
+		return step;
+	}
+};
+*/
+
 		['[data-module="model"]', 'run', async e => {
 			const plots_container = elem.querySelector('.plots');
-			const step_interval = 10;
+			const step_interval = localStorage.getItem('mdx_step_interval') || 10;
 			if (!storage.loop || e.detail?.reset) {
-				e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false}}));
+				await new Promise(resolve => e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false, resolve}})));
 				const request = {framework: entry.framework, sources: [{type: 'script', private: entry.private, model_id: entry.model_id, framework: entry.framework}], params: storage.params};
 				const stream = await new Promise(resolve => document.querySelector('.apocentric').dispatchEvent(new CustomEvent('dynamics', {detail: {request, resolve}}))).then(stream => stream.getReader());
 				const step_storage = [];
@@ -223,6 +216,8 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 					if (step.done)
 						return e.target.dispatchEvent(new Event('stopped'));
 					step_storage.push(step.value);
+					//if (step_storage.length > 101) // This should be managed by the plot itself, receiving another timepoint beyond the x-axis will result in changing the axis or a sliding window
+					//	step_storage.shift();
 					draw(plots_container, step_storage, 0, true);
 					storage.timeout = setTimeout(storage.loop, step_interval);
 				};
@@ -233,11 +228,13 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'P');
 		}],
 		['[data-module="model"]', 'run_browser', async e => {
+			const step_interval = localStorage.getItem('mdx_step_interval') || 10;
 			if (storage.step_module === undefined || e.detail?.reload) {
-				storage.step_module = entry.framework === 'js' ? await import(`${entry.module_url}${e.detail?.reload ? `?${new Date().getTime()}` : ''}`) : (entry.framework === 'py' ? await pythonModuleWrapper(entry, e.detail?.reload) : false);
+				storage.step_module = entry.framework === 'js' ? await import(`${entry.module_url}${e.detail?.reload ? `?${new Date().getTime()}` : ''}`) : (entry.framework === 'py' ? await pythonModuleWrapper(elem, entry, e.detail?.reload) : false);
 			}
 			if (!storage.loop || e.detail?.reset) {
-				e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false}}));
+				//e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false}}));
+				await new Promise(resolve => e.target.dispatchEvent(new CustomEvent('init', {detail: {save: false, resolve}})));
 				const stats = []; // Rename
 				if (storage.timeout)
 					clearTimeout(storage.timeout);
@@ -249,7 +246,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 					const step = stepWrapper(elem, storage.step_module, storage.params, _step, stats);
 					if (!step)
 						return e.target.dispatchEvent(new Event('stopped'));
-					storage.timeout = setTimeout(storage.loop, 10, step);
+					storage.timeout = setTimeout(storage.loop, step_interval, step);
 				};
 			}
 			if (e.target.dataset.state !== 'paused')
@@ -277,6 +274,18 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			e.target.dataset.state = 'stopped';
 			elem.querySelectorAll('[data-action="start"]').forEach(item => item.dataset.icon = 'p');
 			delete storage.loop;
+		}],
+		['[data-module="model"]', 'loading', e => {
+			const plots = e.target.querySelector('.plots');
+			plots.classList.add('loading');
+			const div = document.createElement('div');
+			div.classList.add('overlay');
+			div.innerHTML = 'Loading libraries...';
+			plots.appendChild(div);
+		}],
+		['[data-module="model"]', 'loaded', e => {
+			e.target.querySelector('.plots').classList.remove('loading');
+			e.target.querySelectorAll('.plots .overlay').forEach(item => item.remove());
 		}],
 		['a[data-saved]', 'click', e => {
 			const id = e.target.dataset.saved;
@@ -369,7 +378,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 			if (selected.length > 0)
 				runGrid(entry, elem.querySelector('.parameters-menu .form'), query, elem.querySelector('.plots'), title);
 			else
-				elem.dispatchEvent(new Event('run'));
+				elem.dispatchEvent(new Event(localStorage.getItem('mdx_state') === 'test' ? 'run' : 'run_browser'));
 		}],
 		['.option label', 'click', e => {
 			const option = e.target.closest('.option');
@@ -377,7 +386,7 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 				option.querySelector('label input').value = '';
 				return option.classList.remove('selected');
 			}
-			const letters = ['x', 'y', 'z', 's']; // TODO: replace this solution
+			const letters = ['x', 'y']; // TODO: replace this solution
 			const selected = Array.from(e.target.closest('.form').querySelectorAll('.option.selected'));
 			const current_dims = selected.map(elem => elem.querySelector('label input').value);
 			const remaining_dims = letters.filter(v => !current_dims.includes(v));
@@ -388,6 +397,15 @@ export const model = (env, {entry, query}, elem, storage={}) => ({
 		}],
 		['[data-action="grid"]', 'click', e => {
 			runGrid(entry, elem.querySelector('.parameters-menu .form'), query, elem.querySelector('.plots'));
+		}],
+		['[data-action="copy"]', 'click', e => {
+			fetch(`https://d.modelrxiv.org/submit`, {method: 'POST', headers: {Authorization: `Basic ${getCredentials('token')}`}, body: JSON.stringify({action: 'copy', model_id: entry.model_id, framework: entry.framework})}).then(res => res.json())
+				.catch(e => {
+					console.log('Failed to copy model', e);
+				})
+				.then(res => {
+					document.querySelector('.main').dispatchEvent(new CustomEvent('navigate', {detail: {url: `/sandbox/${res.model_id}`}}));
+				});
 		}],
 		['[data-action="publish"]', 'click', e => {
 			fetch(`https://d.modelrxiv.org/submit`, {method: 'POST', headers: {Authorization: `Basic ${getCredentials('token')}`}, body: JSON.stringify({action: 'publish', model_id: entry.model_id, framework: entry.framework})}).then(res => res.json())

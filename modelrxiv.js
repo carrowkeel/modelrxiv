@@ -1,37 +1,6 @@
 'use strict';
 
-const numericize = v => Array.isArray(v) ? v.map(numericize) : typeof v === 'object' ? Object.keys(v).reduce((a,_v)=>Object.assign(a, {[_v]: numericize(v[_v])}), {}) : (v !== '' && v !== null && !isNaN(v) ? +(v) : v);
-
-const loadScript = (script, type="script") => new Promise(resolve => {
-	if (document.head.querySelectorAll(`script[src="${script}"]`).length > 0)
-		return resolve();
-	const elem = document.createElement(type);
-	type === 'link' ? elem.href = script : elem.src = script;
-	elem.addEventListener('load', () => resolve());
-	document.head.appendChild(elem);
-});
-
-const parseJSON = (text, default_value={}) => {
-	try {
-		if (text === null)
-			throw 'JSON string missing';
-		return JSON.parse(text);
-	} catch (e) {
-		return default_value;
-	}
-};
-
-const queryFromPath = (defaults = {}) => numericize(window.location.pathname.substring(1).split('/').reduce((a,v,i,arr)=>i%2===0&&arr[i+1]!==undefined?Object.assign(a, {[v]: arr[i+1]}):a, defaults));
-
-const addModule = (elem, name, options={}, replace_element=false) => new Promise((resolve, reject) => {
-	const module = replace_element ? elem : elem.appendChild(document.createElement('div'));
-	module.dataset.module = name;
-	Object.keys(options).forEach(k => typeof options[k] !== 'object' ? module.dataset[k] = options[k] : 0);
-	module.dispatchEvent(new CustomEvent('render', {detail: {options}}));
-	module.addEventListener('done', e => {
-		resolve({module, data: e.detail});
-	});
-});
+const queryFromPath = (path, defaults = {}) => numericize(path.substring(1).split('/').reduce((a,v,i,arr)=>i%2===0&&arr[i+1]!==undefined?Object.assign(a, {[v]: arr[i+1]}):a, defaults));
 
 const staticDB = options => ({
 	data: {},
@@ -63,14 +32,6 @@ const staticDB = options => ({
 	}
 });
 
-const signedURL = (url, query = {}) => {
-	const signature = getCredentials('cdn');
-	if (!signature)
-		return url;
-	const qs = new URLSearchParams(Object.assign({}, query, signature));
-	return `${url}?${qs.toString()}`;
-};
-
 const addHooks = (elem, hooks) => {
 	for (const type of Object.keys(hooks.reduce((a,v)=>Object.assign(a, {[v[1]]: 1}), {}))) {
 		elem.addEventListener(type, e => {
@@ -80,34 +41,6 @@ const addHooks = (elem, hooks) => {
 			}
 		}, true);
 	}
-};
-
-const readForm = (form, defaults = {}) => {
-	if (!form)
-		return defaults;
-	const args = {};
-	Array.from(form.querySelectorAll('[name]:not(.range)')).filter(item => item.closest('.form, .entry') === form).forEach(item => {
-		const name = item.getAttribute('name');
-		if (item.getAttribute('type') === 'checkbox')
-			return item.checked ? Object.assign(args, {[name]: args[name] ? args[name].concat(item.value) : [item.value]}) : 0;
-		switch(item.dataset.type) {
-			case 'json':
-				Object.assign(args, {[name]: JSON.parse(item.value)});
-				break;
-			case 'vector':
-				Object.assign(args, {[name]: item.value.split(',').map(v => +(v))});
-				break;
-			default:
-				Object.assign(args, {[name]: item.value});
-		}
-	});
-	Array.from(form.querySelectorAll('[data-entry]')).filter(item => item.parentElement.closest('.form, .entry') === form).forEach(entry => {
-		const name = entry.dataset.entry;
-		const data = readForm(entry);
-		if (data.name)
-			Object.assign(args, {[name]: args[name] ? args[name].concat(data) : [data]});
-	});
-	return Object.assign(defaults, args);
 };
 
 const filterModels = (models, query) => {
@@ -196,6 +129,12 @@ const hooks = env => [
 	['[data-action="logout"]', 'click', e => {
 		document.querySelector('.mdx-auth').dispatchEvent(new Event('loggedout'));
 	}],
+	['.login-form input', 'keydown', e => {
+		if (e.keyCode === 13) {
+			const args = readForm(e.target.closest('.form'));
+			auth(env, args);
+		}
+	}],
 	['.login-button', 'click', e => {
 		const args = readForm(e.target.closest('.form'));
 		auth(env, args);
@@ -255,23 +194,19 @@ const hooks = env => [
 
 // TODO: restructure this function
 const navigate = async (env, url, back=false, reload=false) => {
-	if (!reload) {
-		if (back)
-			window.history.replaceState({page: url}, '', url);
-		else
-			window.history.pushState({page: url}, '', url);
-	}
 	for (const slug in env.processes) {
 		clearTimeout(env.processes[slug].timeout);
 		delete env.processes[slug];
 	}
-	const query = queryFromPath();
-	const pagename = window.location.pathname.substring(1);
+	const uri = url || window.location.pathname;
+	const query = queryFromPath(uri);
+	const pagename = uri.substring(1);
 	const main_elem = document.querySelector('.main');
+	const static_pages = {login: 'Login', register: 'Register', privacy: 'Privacy', terms: 'Terms', contribute: 'Contribute'}; // Remove using cloudfront origin function or similar solution
 	switch(true) {
-		case env.static_pages[pagename] !== undefined:
+		case static_pages[pagename] !== undefined:
 			fetch(`/pages/${pagename}`).then(res => res.text()).then(html => {
-				document.title = `${env.static_pages[pagename]} | modelRxiv`;
+				document.title = `${static_pages[pagename]} | modelRxiv`;
 				main_elem.innerHTML = `<div class="page">${html}</div>`;
 			});
 			break;
@@ -279,7 +214,7 @@ const navigate = async (env, url, back=false, reload=false) => {
 			main_elem.innerHTML = '';
 			const entry = query.edit ? await env.db.get(signedURL(`users/${getCredentials('user_id')}/.list`), ['model_id', query.edit]) : false;
 			const data = entry ? await env.db.get(signedURL(`users/${getCredentials('user_id')}/${entry.model_id}.json`), [], {private: true}) : false; // This repeats below
-			addModule(main_elem, 'submit', {entry: data, query});
+			await addModule(main_elem, 'submit', {entry: data, query});
 			break;
 		}
 		case query.model !== undefined || (query.sandbox !== undefined && getCredentials('user_id') !== false): {
@@ -290,9 +225,9 @@ const navigate = async (env, url, back=false, reload=false) => {
 				const data = await (query.sandbox ?
 					env.db.get(signedURL(`users/${getCredentials('user_id')}/${entry.model_id}.json`), [], {private: true}) :
 					env.db.get(`models/${query.model}.json`));
-				addModule(main_elem, 'model', {entry: data, query});
+				await addModule(main_elem, 'model', {entry: data, query});
 			} else
-				navigate(env, '/');
+				return navigate(env, '/');
 			break;
 		}
 		default:
@@ -302,6 +237,12 @@ const navigate = async (env, url, back=false, reload=false) => {
 			});
 			Object.entries(query).forEach(([name, value]) => main_elem.querySelectorAll(`.filters [name="${name}"]`).forEach(item => item.value = value)); // Maybe move elsewhere
 			main_elem.querySelector('.filtered-list').dispatchEvent(new Event('refresh'));
+	}
+	if (!reload) {
+		if (back)
+			window.history.replaceState({page: url}, '', url);
+		else
+			window.history.pushState({page: url}, '', url);
 	}
 };
 
@@ -320,28 +261,18 @@ const auth = (env, login={}) => {
 					navigate(env, '/');
 			}
 			document.querySelector('.mdx-auth').dispatchEvent(new CustomEvent('authenticated', {detail: {token: auth_data.data?.token || token}}));
-		} else
-			document.querySelector('.mdx-auth').dispatchEvent(new CustomEvent('loggedout', {detail: {login: login.user_name !== undefined}}));
+		} else {
+			throw 'Authentication failed';
+		}
 	}).catch(e => {
+		document.querySelector('.mdx-auth').dispatchEvent(new CustomEvent('loggedout', {detail: {login: login.user_name !== undefined}}));
+		document.querySelectorAll('.login-form .error').forEach(item => item.innerHTML = 'Login details incorrect');
 		console.log(e);
 	});
 };
 
-const getCredentials = (type) => { // Add same or combined for setting credentials
-	if (!type)
-		return ['user_id', 'token', 'cdn'].reduce((credentials, key) => Object.assign(credentials, {[key]: getCredentials(key)}), {});
-	switch(type) {
-		case 'user_id':
-			return localStorage.getItem('mdx_user') || false;
-		case 'token':
-			return localStorage.getItem('mdx_token') || false;
-		case 'cdn':
-			return parseJSON(localStorage.getItem('mdx_signature'), false);
-	}
-};
-
-const init = async () => {
-	const env = {static_pages: {login: 'Login', register: 'Register', privacy: 'Privacy', terms: 'Terms', contribute: 'Contribute'}, db: staticDB({uri: 'https://modelrxiv.org'}), processes: {}, timeouts: {}};
+export const modelrxiv = async () => {
+	const env = {db: staticDB({uri: 'https://mdx1.modelrxiv.org'}), processes: {}, timeouts: {}};
 	addHooks(window, hooks(env));
 	await auth(env);
 	addModule(document.querySelector('.apocentric'), 'apc', {options: {getCredentials, worker_script: '/worker.js', url: 'wss://apc.modelrxiv.org', threads: navigator.hardwareConcurrency, frameworks: ['js', 'py']}}, true);
@@ -351,9 +282,3 @@ const init = async () => {
 	});
 	navigate(env, undefined, false, true);
 };
-
-window.addEventListener('load', () => {
-	if (window.location.origin.match('www.modelrxiv.org'))
-		return window.location.href = 'https://modelrxiv.org';
-	init();
-});

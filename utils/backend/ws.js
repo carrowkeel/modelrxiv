@@ -14,14 +14,17 @@ const decompress = base64 => {
 };
 
 const wsReceiveParts = (ws, request_id, parts = [], n = 0) => new Promise((resolve, reject) => {
-	ws.on('message', e => {
+	const handle_part = e => {
 		const message_data = JSON.parse(e.utf8Data);
 		if (message_data.request_id !== request_id)
 			return;
 		parts.push([message_data.part, message_data.data]);
-		if (message_data.parts === parts.length)
+		if (message_data.parts === parts.length) {
+			ws.off('message', handle_part);
 			resolve(parts.sort((a,b) => a[0] - b[0]).map(v => v[1]).join(''));
-	});
+		}
+	};
+	ws.on('message', handle_part);
 });
 
 const decodeMessage = async (ws, message_data, receiving) => {
@@ -42,34 +45,6 @@ const wsSend = async (ws, request, websocket_frame_limit = 30 * 1024, compressio
 	} else
 		ws.sendUTF(JSON.stringify(Object.assign(request, {compression: compression_type, data: compressed})));
 };
-
-const wsConnectSend = (websocket_url, options, user, request_id, result, attempt=0, retries=3) => new Promise((resolve, reject) => {
-	const params = new URLSearchParams({authorization: options.credentials.token, ...options.machine});
-	const WebSocketClient = require('websocket').client;
-	const ws = new WebSocketClient();
-	ws.on('connectFailed', e => {
-		console.log('WebSocket connection failed', e);
-		if (attempt < retries)
-			wsConnectSend(websocket_url, options, user, request_id, data, attempt + 1);
-		else {
-			require('fs/promises').writeFile(`${request_id}.result`, JSON.stringify(result));
-			reject();
-		}
-	});
-	ws.on('connect', connection => {
-		connection.on('close', () => {
-			console.log('Websocket disconnected');
-		});
-		connection.on('error', e => {
-			console.log('WebSocket error', e);
-			require('fs/promises').writeFile(`${request_id}.result`, JSON.stringify(result));
-		});
-		wsSend(connection, {type: 'result', request_id: request_id, user, machine_id: options.machine.id}, result);
-		connection.close();
-		resolve();
-	});
-	ws.connect(`${websocket_url}/?${params.toString()}`);
-});
 
 const wsConnect = (module, websocket_url, options, receiving=[]) => {
 	const WebSocketClient = require('websocket').client;
@@ -123,8 +98,6 @@ const ws = (module, {apc, options, local}, storage={receiving: [], status: 'disc
 		}],
 		['send', data => {
 			return wsSend(storage.ws, data);
-			// From job
-			//return wsSend(connection, {type: 'result', request_id: request.request_id, user: request.user, machine_id: options.machine.id, data: result});
 		}],
 		['message', message => {
 			apc.emit('message', message);
