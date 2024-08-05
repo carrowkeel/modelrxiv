@@ -40,16 +40,25 @@ value=1
 name=q0
 description=Initial frequency of the allele
 
+# Parameter: Steps
+name=step_num
+description=Number of steps to run the model for
+value=100
+
 # Plot: Allele frequency
 type=line
 xlabel=Generations
 ylabel=Frequency
+xlim=0,step_num
+ylim=0,1
 x=t
 y=q
 
 # Preset: Fig. 1, Negative selection
 s=0.1
+h=0.5
 
 # Preset: Fig. 1, Positive selection
 s=-0.1
+h=0
 ```
