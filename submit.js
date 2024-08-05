@@ -105,6 +105,37 @@ const pollS3 = async (url, retry_limit=20, increment=5) => {
 	throw 'Failed to load S3 object';
 };
 
+const queryGPT = async (form, code, options, autotest=true) => {
+	const request_id = Math.round(Math.random() * 1e6);
+	const request = await fetch(`https://d.modelrxiv.org/import`, {method: 'post', headers: {Authorization: `Basic ${getCredentials('token')}`, 'Content-Type': 'application/json'}, body: JSON.stringify(Object.assign({code, request_id}, options))}).then(res => res.json()).catch(e => ({error: e}));
+	const tab = document.createElement('div');
+	tab.dataset.tab = `tab_${request_id}`;
+	tab.dataset.status = `edited`;
+	tab.innerHTML = 'GPT Result <a data-icon="x" data-action="close"></a>';
+	form.querySelector('.editor .tabs').appendChild(tab);
+	const tab_content = document.createElement('div');
+	form.querySelector('.editor').appendChild(tab_content);
+	tab_content.classList.add('code', 'gpt');
+	tab_content.dataset.tabContent = `tab_${request_id}`;
+	tab_content.dataset.status = 'edited';
+	tab_content.innerHTML = `<textarea name="code" class="loading">Waiting for GPT response</textarea>`;
+	form.querySelector(`.editor .tabs [data-tab="tab_${request_id}"]`).dispatchEvent(new Event('click'));
+	const t = setInterval(() => tab_content.querySelector('textarea.loading').value = tab_content.querySelector('textarea.loading').value + '.', 1000);
+	try {
+		const result = await pollS3(signedURL(`/users/${getCredentials('user_id')}/resources/${request_id}`), 10, 6).then(res => res.text());
+		clearTimeout(t);
+		const code_part = result.match(/[\`]{3}[a-zA-Z0-9]+\n(.*?)[\`]{3}/s) || ['', ''];
+		const text_part = result.replace(/[\`]{3}.*?[\`]{3}/s, '');
+		tab_content.innerHTML = `<textarea name="code">${code_part[1]}</textarea><div class="comment">${text_part}</div>`;
+		if (autotest)
+			document.querySelector('[data-action="test-code"]').click();
+	} catch (e) {
+		clearTimeout(t);
+		tab_content.querySelector('textarea.loading').value = 'Failed to load result';
+		console.log(e);
+	}
+};
+
 const hooks = (env, entry, query, elem) => [
 	['[data-module="submit"]', 'update', e => {
 		const data = readForm(elem.querySelector('.submission-form'));
@@ -231,40 +262,21 @@ const hooks = (env, entry, query, elem) => [
 		const code = form.querySelector('.code.show [name="code"]').value;
 		await emception(code);
 	}],
+	// Note that on refresh only the last tab is saved in model editor...
 	['[data-action="import-code"]', 'click', async e => {
 		const form = e.target.closest('.form');
 		const prompt = form.querySelector('.code.show [name="code"]').value;
-		const request_id = Math.round(Math.random() * 1e6);
-		const initial_request = await fetch(`https://d.modelrxiv.org/import`, {method: 'post', headers: {Authorization: `Basic ${getCredentials('token')}`, 'Content-Type': 'application/json'}, body: JSON.stringify({code: prompt, request_id})}).then(res => res.json()).catch(e => ({text: 'Error retrieving response', code: ':('}));
-		// Polling S3 for resource
-		try {
-			const result = await pollS3(signedURL(`/users/${getCredentials('user_id')}/resources/${request_id}`), 10, 6).then(res => res.text());
-			const tab_content = document.createElement('div');
-			tab_content.classList.add('code');
-			tab_content.dataset.tabContent = `tab_${request_id}`;
-			tab_content.dataset.status = 'edited';
-			//const code = typeof result === 'string' ? result.replace(/^.*?```(.*?)```.*$/s, '$1') : result.code;
-			//const text = typeof result === 'string' ? result.replace(/```.*?```/sg, '') : result.text;
-			tab_content.innerHTML = `<textarea name="code">${result}</textarea><div class="comment"></div>`; // ${result.text}
-			const tab = document.createElement('div');
-			tab.dataset.tab = `tab_${request_id}`;
-			tab.dataset.status = `edited`;
-			tab.innerHTML = 'GPT Result <a data-icon="x" data-action="close"></a>';
-			form.querySelector('.editor').appendChild(tab_content);
-			form.querySelector('.editor .tabs').appendChild(tab);
-			form.querySelector(`.editor .tabs [data-tab="tab_${request_id}"]`).dispatchEvent(new Event('click'));
-		} catch (e) {
-			console.log(e);
-		}
+		const framework = form.querySelector('[name="framework"]').value || 'python';
+		queryGPT(form, prompt, {framework});
 	}],
 	['[data-action="test-code"]', 'click', async e => { // TODO: move to function
 		const form = e.target.closest('.form');
 		const framework = form.querySelector('[name="framework"]').value;
 		const tab = form.querySelector('.code.show').dataset.tabContent;
+		const gpt = form.querySelector('.code.show').classList.contains('gpt');
 		const code = form.querySelector('.code.show [name="code"]').value;
 		if (framework === '' || code === '')
 			return;
-		// Instead put the code into CacheStorage
 		const key = await fetch(`https://d.modelrxiv.org/submit`, {method: 'POST', headers: {Authorization: `Basic ${getCredentials('token')}`}, body: JSON.stringify({action: 'sandbox', framework, code})}).then(res => res.json()).then(json => json.key);
 		new Promise(resolve => {
 			const request = {
@@ -286,6 +298,8 @@ const hooks = (env, entry, query, elem) => [
 			error_box.classList.add('show');
 			if (result.error) {
 				form.querySelectorAll(`.editor [data-tab="${tab}"], .editor [data-tab-content="${tab}"]`).forEach(elem => elem.dataset.status = 'test-fail');
+				if (gpt)
+					queryGPT(form, code, {framework, error: result.error.toString()});
 				return error_box.innerHTML = result.error;
 			}
 			error_box.innerHTML = 'Model code ran successfully';
