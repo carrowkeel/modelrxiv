@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>How to upload models to modelRxiv</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" type="text/css" href="/css/main.css">
+</head>
+<body class="text-page">
+<header>
+	<div class="wrap">
+		<nav class="fright"><div class="auth" data-module="apc/auth" data-auth="guest"><span data-auth="guest"><a data-action="login" data-icon="l">Login</a></span><span data-auth="auth"><a data-icon="u" href="/submit.html" title="Upload model">Upload</a><a data-icon="L" data-action="logout" title="Logout">Logout</a></span></div></nav>
+		<a href="/" class="logo" data-icon="A">modelRxiv</a>
+	</div>
+</header>
+<div class="wrap">
+	<div data-module="help">
+	<div class="toc"></div>
+	<div class="main tutorial">
+		<h1>Uploading models to modelRxiv</h1>
+		<p>This page provides an overview of the process of uploading models, including details about implementing the modelRxiv protocol. Researchers are encouraged to upload their published or unpublished models to modelRxiv to allow a wider audience to access the model, manipulate parameters, and regenerate results. modelRxiv does not require that uploaded models be accepted at a peer-reviewed journal before uploading, but you must be allowed to make the model code publicly available (see our <a href="/terms.html" target="_blank">terms of use</a> for more information. To read more about the goals of the platform, see the <a target="_blank" href="https://www.biorxiv.org/content/10.1101/2022.02.16.480599v2.full">preprint</a>.</p>
+		<h2>Registration</h2>
+		<p>Before uploading a model, you will need to create an account and log in. This can be done by clicking on the "Login" button on the top right corner of the page, and opening the "Register" tab. Once you have created an account, you can login using your credentials on the Login dialog box.</p>
+		<div class="screenshot"><img src="/images/modelrxiv_register.png" alt="A screenshot of the open register dialog box on modelRxiv"></div>
+		<p>Once logged in, you will see an "Upload" button at the top right corner of the page.</p>
+		<h2>Upload page</h2>
+		<p>The upload page is designed to allow uploaders to paste their model code and gradually adapt it to modelRxiv, either by manually editing the code and testing it, or by using the AI-assisted features for code conversion. The upload process has four main steps:</p>
+		<ul>
+			<li>Adding your model code. The model code box must contain the entire code necessary to generate the model results and be compatible with modelRxiv (see below).</li>
+			<li>Describing your model using the modelRxiv scheme format. The scheme includes publication information, the list of parameters that users can manipulate, visualizations of the dynamics, and presets of parameters that allow users to regenerate certain scenarios or figures.</il>
+			<li>An optional step of using the AI-assisted conversion pipeline to make your model compatible with modelRxiv.</li>
+			<li>Testing your model to assure that it works and is compatible with modelRxiv. Once you have successfully tested the model, it can be uploaded.</li>
+		</ul>
+		<h2>Model code</h2>
+		<p>When you first open the upload page, you will see a blank textarea for your code. You can either provide code that conforms to the <a href="#protocol">modelRxiv protocol</a>, or use the AI-assisted pipeline to convert it (recommended). To see an example of a simple model that is compatible with modelRxiv to use as a template, click the "Load example" button at the bottom right of the textarea.</p>
+		<div class="screenshot"><img src="/images/modelrxiv_upload.png" alt="A screenshot of the model scheme and code boxes on the modelRxiv upload page, with an example model"></div>
+		<h2>Model scheme</h2>
+		<p>The model scheme describes your model to modelRxiv, including its parameters and visual outputs. This allows modelRxiv to provide the appropriate adjustable parameters to users, and to create dynamic plots based on the output of running the model code. You can also add descriptions to the scheme to help users understand your model. To demonstrate the scheme, we consider a simple model of selection:</p>
+		<div class="code-example" data-type="python">
+			<pre><code class="language-python">def step(params: dict, last_step: dict, t: int) -> dict:
+    ## Compute the next step given the last step and the model parameters
+    if t == 0: ## When called the first time, return the initial frequency
+        return {'q': params['q0']}
+    q = last_step['q']
+    s = params['s']
+    h = params['h']
+    q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2)
+    return {'q': q_prime}</code></pre>
+		</div>
+		<p>The scheme is divided into sections: each section begins with a line starting with a hash character `#` followed by the type of section. The following lines are parameter definitions for the specific section.</p>
+		<p>The basic section of the scheme describes the study and possibly the publication to which the model relates. For instance, in the example below, the scheme metadata is filled with information relating to a specific publication:</p>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Metadata
+title=The Genetical Theory of Natural Selection
+description=Natural Selection is not Evolution. Yet, ever since the two words have been in common use, the theory of Natural Selection has been employed as a convenient abbreviation for the theory of Evolution by means of Natural Selection, put forward by Darwin and Wallace. This has had the unfortunate consequence that the theory of Natural Selection itself has scarcely ever, if ever, received separate consideration.
+authors=R. A. Fisher
+doi=
+type=published
+publication_date=1930
+keywords=natural-selection,evolution
+framework=py</code></pre>
+		</div>
+		<p>Note that the metadata also includes the field "framework", which indicates which coding framework the model code uses. This can either be "py" for Python or "js" for JavaScript.</p>
+		<p>Now we want to allow a parameter in the model to be "exposed" to the user, so that they can manipulate the parameter using the interface. We can do this by adding a "Parameter" section:</p>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Parameter: s
+name=s
+description=The relative fitness cost of the allele
+value=0.1</code></pre>
+		</div>
+		<p>This adds a parameter `s` with a default value `0.1` to the model, with the label "s". The label can also contain an underscore character `_` to use subscript formatting.</p>
+		<p>Now that we have some model parameters, we can add plots. Plots take the output of the model code and connect them to a specific plot type. In the example below, we take the frequency of the allele from the model, the dynamic parameter `q`, and create a line plot for `q` over the time steps of the model:</p>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Plot: Allele frequency over time
+type=line
+x=t
+y=q
+xlabel=Generations
+ylabel=Frequency</code></pre>
+		</div>
+		<p>In this example, we set the x-axis as `t`, which is the time step of the model, and the y-axis as `q`. We also added x- and y-axis labels. We could additionally set the x- and y-axis limits, for instance, using `xlim=0,0.5`. For available plots and parameters, see the list of <a href="#visualizations">visualizations</a>.</p>
+		<h3>Optional scheme features</h3>
+		<p>In many cases it is helpful to guide users through specific scenarios of interest by providing parameter presets. If you provide presets with your model, they will be displayed to the user by default, instead of the list of parameters. They can then choose specific presets (which will run the model with the specific parameter set), and begin exploring the model by modifying the parameters around these scenarios of interest. Here are two example presets in our simple evolutionary model:</p>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Preset: Positive selection, recessive
+q0=0.1
+s=-0.1
+h=0
+
+# Preset: Negative selection, dominant
+q=0.5
+s=0.1
+h=1</code></pre>
+		</div>
+		<p>You can add as many parameter definitions as you like to each preset. These will modify the existing user parameters and run the model, when clicked by a user.</p>
+		<h2>AI-assisted conversion pipeline</h2>
+		<p>The conversion pipeline was designed to reduce the effort required for integrating existing models with modelRxiv. It takes the model code and the current scheme text and attempts to convert the model code so that it is compatible, and create a scheme that matches parameters and plots described in the model code. By using this pipeline, you consent to the original model code being sent to servers of the LLM provider, and being retained on our servers for the purpose of improving our pipeline (see our <a target="_blank" href="/privacy.html">privacy policy</a> for more details).</p>
+		<h2>Testing your model</h2>
+		<p>At any stage of uploading your model you can run a test to see that modelRxiv is correctly interpreting the scheme and producing the correct dynamics output. Errors that occur while attempting to run the model will be displayed in an error box in this section of the form. Here we test the example model we discussed above and generate model dynamics:</p>
+		<div class="screenshot"><img src="/images/modelrxiv_test.png" alt="A screenshot of a model test, showing the graphical output of the model"></div>
+		<h2>Model analyses</h2>
+		<p>modelRxiv is aimed at models that can generate dynamics visualizations on-the-fly rather than running computationally intensive analyses that might take hours or days. However, seeing as models may include results that do not fit the step-wise dynamics display, modelRxiv also allows uploaders to specify a function in their code that can generate a figure. Analyses run some code and return an image, or data that matches one of the visualizations on modelRxiv. For instance, we can use the `matplotlib` library to generate an image that will be displayed in the browser:</p>
+		<a name="matplotlib-example"></a><div class="code-example" data-type="python">
+			<pre><code class="language-python">import matplotlib.pyplot as plt
+
+async def my_analysis(params):
+	fig = plt.figure(figsize=(6,6)) # Create a square image
+	plt.imshow(np.random.normal(size=(100,100), scale=params['s'], loc=0.5))
+	plt.axis('off') # Remove axes
+	plt.tight_layout(pad=0) # Remove padding around image
+	plt.show()</code></pre>
+		</div>
+		<p>In this example, we intentionally hide the axes and remove padding so that the image fits the square grid on modelRxiv. We can then specify the axes in the analysis definition in the model scheme:</p>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Analysis: generate_grid
+function=my_analysis
+type=image
+xlabel=x
+ylabel=y
+xlim=0,100
+ylim=0,100</code></pre>
+		</div>
+		<p>In the example below, we define an analysis that generates a 2-dimensional grid figure.</p>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Analysis: fixation_analysis_grid
+function=run_fixation_grid
+type=grayscale_2d
+xlabel=s
+ylabel=h
+xlim=0,1
+ylim=0,1</code></pre>
+		</div>
+		<p>Note that the function `run_fixation_grid` must be defined in your code and return data that fits the `grayscale_2d` (grayscale matrix) plot. Below is an example of such a function that runs the model dynamics and returns a result of 0 or 1 for a grayscale matrix.</p>
+		<div class="code-example" data-type="python">
+			<pre><code class="language-python"># This function runs the model and returns 1 if the allele is close to fixation
+async def single_run(params):
+	last_step = None
+	for t in range(0, int(params['step_num']) + 1):
+		next_step = step(params, last_step, t)
+		if not next_step:
+			break
+		last_step = next_step
+	return int(last_step['q'] > 0.99)
+
+async def run_fixation_grid(params):
+	# Create a grid of parameters, this could also be done with loops
+	s = np.linspace(0, 1, 51)
+	h = np.linspace(0, 1, 51)
+	grid_x, grid_y = np.meshgrid(s, h)
+	grid = np.array([grid_x.reshape(len(s) * len(h)), grid_y.reshape(len(s) * len(h))]).T
+	# Combine with input parameters
+	param_sets = [{**params, 's': x_y[0], 'h': x_y[1]} for x_y in grid]
+	# Distribute grid computation
+	results = await distribute('single_run', param_sets)
+	grayscale_matrix = np.array(results).reshape(len(s), len(h)).tolist()
+	return grayscale_matrix</code></pre>
+		</div>
+		<p>Note that we used the `distribute` function in order to compute the model results in parallel. This is handled by modelRxiv and ensures that computational resources are not overused by multiple analyses.</p>
+		<p>Now that we defined this analysis, we can also define presets that run it with different fixed parameters:</p>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Preset: Fig. 2: Fixation grid (q0=0.5)
+analysis=fixation_analysis_grid
+q0=0.5
+
+# Preset: Fig. 2: Fixation grid (q0=0.1)
+analysis=fixation_analysis_grid
+q0=0.1</code></pre>
+		</div>
+		<p>When users click these presets, the grid will be computed by running the `run_fixation_grid` in your code. Users will see a progress bar on the preset while the result is being generated. We suggest avoiding analyses that take more than a few minutes to compute results (even with multi-threading), as users will likely navigate away from the page if the waiting time is too long.</p>
+		<a name="visualizations"></a><h2>Visualizations</h2>
+		<p>modelRxiv currently supports a number of plots for dynamics data. These plots are listed below. For analyses, it is possible to use the Python library <a href="https://matplotlib.org/stable/index.html" target="_blank">matplotlib</a>; figures generated in analysis functions using matplotlib (see the <a href="#matplotlib-example">example</a> above) will appear in the browser as images.</p>
+		<h3>Line plot</h3>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Plot: Population size over time
+type=line
+x=t
+y=N
+xlabel=Generations
+ylabel=Population size
+xlim=0,step_num
+ylim=0,K</code></pre>
+		</div>
+		<p>This plot takes output data from your step function, defined by `x=t` and `y=N`, and generates a line plot as the model runs. In this example, we also set limits for the axes using `xlim` and `ylim`. These fields take two numbers or parameter names separated by a comma. For `xlim`, we used `0,step_num`, meaning that the x-axis goes from 0 to the value of the `step_num` parameter, which is the parameter that tells modelRxiv how many iterations to run the dynamics for. For `ylim`, we used `0,K`, meaning that the y-axis goes from 0 to the value of a carrying capacity parameter `K`. This means that if the user updates these parameters, the plot limits will be updated. A step function that produces data for this plot might look like:</p>
+		<div class="code-example" data-type="python">
+			<a data-action="show-screenshot">show screenshot</a>
+			<pre><code class="language-python">def step(params, last_step, t):
+	K = params['K']
+	r = params['r']
+	if t == 0 or not last_step:
+		return {'N': params['K'] / 2} # Set initial population size
+	N = last_step['N']
+	N_next = r * N * (1 - (N / K))
+	return {'N': N_next}</code></pre>
+			<div class="screenshot"><img src="/images/modelrxiv_lineplot1.png" alt="A screenshot of model dynamics using a line plot"></div>
+		</div>
+		<p>To be compatible with the line plot, `N` should be a number (it can be an int or a float). Note that while we need to return `N` for the dynamics plot, `t` does not need to be returned as it is provided to the dynamics plot by modelRxiv.</p>
+		<p>To plot multiple lines, for instance if we had multiple populations, you can use a comma to separate the names of the output parameters. In the example below, we also use the `legend` parameter to specify how the lines will be annotated (with indices as subscript).</p>
+		<div class="code-example" data-type="model scheme">
+			<a data-action="show-screenshot">show screenshot</a>
+			<pre><code class="language-ini"># Plot: Population size over time
+type=line
+x=t
+y=N1,N2
+xlabel=Generations
+ylabel=Population size
+xlim=0,step_num
+ylim=0,K
+legend=N_1,N_2</code></pre>
+			<div class="screenshot"><img src="/images/modelrxiv_lineplot2.png" alt="A screenshot of model dynamics using a line plot with two lines"></div>
+		</div>
+		<h3>Scatter plot</h3>
+	</div>
+	<div class="clear"></div>
+	</div>
+</div>
+<footer>
+	<div class="wrap">
+		<div class="col">
+			<p><a href="/help.html">How to upload models</a></p>
+			<p><a href="/terms.html">Terms of use</a></p>
+			<p><a href="/privacy.html">Privacy policy</a></p>
+		</div>
+		<div class="col"></div>
+		<div class="col">
+			<p>Platform code licensed under <a href="/COPYING">AGPLv3</a>. Uploaded models are licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">CC BY 4.0</a> unless otherwise stated.</p>
+		</div>
+		<div class="clear"></div>
+	</div>
+</footer>
+<script src="/prism.js"></script>
+<script src="/apc/init.js"></script>
+</body>
+</html>
