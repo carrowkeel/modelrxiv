@@ -11,8 +11,8 @@ const getCredentials = async (property) => {
 
 const presetsText = (presets) => presets === undefined ? '' : presets.map(preset => `<div class="preset" data-type="${preset.analysis ? 'analysis' : 'dynamics'}"><a data-preset="${preset.label}" title="${preset.analysis ? 'Clicking this preset will run an analysis in your browser. To complete the analysis you will need to stay on this page. Note that analyses may take a few minutes to complete.' : Object.entries(preset).map(([param, value]) => `${param}=${value}`).join('\n')}">${preset.label}</a></div>`).join('');
 
-export const defaultsFromScheme = (scheme) => {
-	return scheme.parameter ? Object.fromEntries(scheme.parameter.map(parameter => [parameter.name, parameter.value || parameter.default])) : {};
+export const defaultsFromScheme = (scheme, default_params = {step_num: 100}) => {
+	return scheme.parameter ? Object.assign(default_params, Object.fromEntries(scheme.parameter.map(parameter => [parameter.name, parameter.value || parameter.default]))) : {};
 };
 
 export const parseModelScheme = (model_id, scheme) => {
