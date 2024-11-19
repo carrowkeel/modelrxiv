@@ -17,12 +17,13 @@
 <div class="wrap">
 	<div class="main" data-module="model">
 		<h2 data-content="title"></h2>
-		<div class="authors"><span data-content="authors"></span> <a href="https://doi.org/" target="_blank" data-content="doi"></a></div><div class="description shorten" data-content="description"></div><div class="controls tabs"><div class="result-tab menu"></div><div class="parameters-menu menu tabbed-content show"><div class="tabs"><a data-tab="parameters" class="">Parameters</a><a data-tab="presets" class="selected">Presets</a></div><div data-tab-content="presets" class="selected" data-content="presets"></div><div data-tab-content="parameters" class="form" data-content="parameters"></div></div><a class="fright" data-action="parameters-menu" title="Edit the model parameters" data-icon="f">Parameters</a><a class="fright" data-action="restart" title="Restart the model" data-icon="R">Restart</a><a class="fright" data-action="start" title="Start/Pause the model" data-icon="r">Run</a><a class="selected" href="#" title="Open the model analysis page">Model</a><a data-action="edit" title="Edit the model code and parameters">Edit</a><a data-action="publish" title="Make the model publicly available (subject to review)">Publish</a></div><div class="plots" data-empty="Initiate model to load results"></div>
+		<div class="authors"><span data-content="authors"></span> <a href="https://doi.org/" target="_blank" data-href="doi" data-content="doi"></a></div><div class="description shorten" data-content="description"></div><div class="controls tabs"><div class="result-tab menu"></div><div class="parameters-menu menu tabbed-content show"><div class="tabs"><a data-tab="parameters" class="">Parameters</a><a data-tab="presets" class="selected">Presets</a></div><div data-tab-content="presets" class="selected" data-content="presets"></div><div data-tab-content="parameters" class="form" data-content="parameters"></div></div><a class="fright" data-action="parameters-menu" title="Edit the model parameters" data-icon="f">Parameters</a><a class="fright" data-action="restart" title="Restart the model" data-icon="R">Restart</a><a class="fright" data-action="start" title="Start/Pause the model" data-icon="r">Run</a><a class="selected" href="#" title="Open the model analysis page">Model</a><a data-action="edit" title="Edit the model code and parameters">Edit</a><a data-action="copy" title="Create a copy of the model">Copy</a><a data-action="publish" title="Make the model publicly available (subject to review)">Publish</a></div><div class="plots" data-empty="Initiate model to load results"></div>
 	</div>
 </div>
 <footer>
 	<div class="wrap">
 		<div class="col">
+			<p><a href="/help.html">How to upload models</a></p>
 			<p><a href="/terms.html">Terms of use</a></p>
 			<p><a href="/privacy.html">Privacy policy</a></p>
 		</div>
@@ -33,6 +34,7 @@
 		<div class="clear"></div>
 	</div>
 </footer>
+<div class="api-loading-overlay"></div>
 <script src="/apc/init.js"></script>
 </body>
 </html>
