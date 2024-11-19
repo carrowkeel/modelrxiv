@@ -15,32 +15,52 @@
 </header>
 <div class="wrap">
 	<div class="main" data-module="submit">
-		<h3 class="upload-model-title">Upload model</h3>
+		<h2 class="upload-model-title">Upload model</h2>
+		<p>To upload a model to modelRxiv, you will need to prepare the model code so that it conforms to the modelRxiv protocol, or use the AI-assisted conversion pipeline. For a detailed tutorial on uploading models with examples, see the <a href="/help.html" target="_blank">help page</a>.</p>
 		<div class="submission-form form wide-form">
-			<div class="section">
+			<div class="section code-step hidden">
 				<div class="header">
-					<a data-icon="G" data-action="generate-scheme" class="fright button" title="Use OpenAI models to generate the model scheme using the current information and the model code">Generate</a>
-					<h3>Metadata and scheme</h3>
-				</div>
-				<div class="content scheme">
-					<div class="editor tabbed-content" data-editor="scheme">
-						<div class="versions"><h5>Versions</h5><div class="version-list"></div></div>
-					</div>
-				</div>
-			</div>
-			<div class="section">
-				<div class="header">
-					<a data-icon="A" data-action="test-code" class="fright button" title="Test that the code runs correctly on modelRxiv">Test</a><a data-icon="G" data-action="convert-code" class="fright button" title="Use OpenAI models to make your code compatible with modelRxiv (this will attempt to convert your code to Python if it is not written in Python or JavaScript)">Convert</a>
-					<h3>Model code</h3>
+					<a data-action="save-draft" class="fright button" title="Save your draft model">Save draft</a><a data-action="clear-form" class="fright button" title="Clear the current contents of the form">Clear form</a>
+					<h3>Step 1: Add your model code</h3>
 				</div>
 				<div class="content code">
 					<div class="editor tabbed-content" data-editor="code">
-						<div class="versions"><h5>Versions</h5><div class="version-list"></div></div>
+						<div class="versions-container"><a class="open-version-list" data-action="version-list">Previous versions</a><div class="versions"><div class="version-list"></div></div></div>
 					</div>
 				</div>
 			</div>
-			<div class="save-form">
-				<a data-action="submit" class="button">Submit</a>
+			<div class="section scheme-step hidden">
+				<div class="header">
+					<h3>Step 2: Fill out the scheme describing your model</h3>
+				</div>
+				<div class="content scheme">
+					<div class="editor tabbed-content" data-editor="scheme">
+						<div class="editor-helper-form form"></div>
+						<div class="editor-helper"><a class="button" data-action="add-scheme-section">+ Add section</a></div>
+						<div class="versions-container"><a class="open-version-list" data-action="version-list">Previous versions</a><div class="versions"><div class="version-list"></div></div></div>
+					</div>
+				</div>
+			</div>
+			<div class="section conversion-step hidden">
+				<div class="header">
+					<a data-icon="G" data-action="convert-code" class="fright button" title="Use an LLM to make your code compatible with modelRxiv (this will attempt to convert your code to Python if it is not written in Python or JavaScript)">Convert/fix code</a>
+					<h3>Step 3 (Optional): AI-assisted model conversion and debugging</h3>
+				</div>
+				<div class="content">
+					<div class="llm-response-box"><pre>The text part of the LLM response will appear here after you run the conversion pipeline.</pre></div>
+					<div class="user-llm-comments"><textarea placeholder="Comments for the AI-assisted conversion pipeline (e.g., plots missing, dynamics output incorrect)"></textarea></div>
+				</div>
+			</div>
+			<div class="section testing-step hidden">
+				<div class="header">
+					<a data-action="test-code" class="fright button" title="Test that the code runs correctly on modelRxiv">Test model</a>
+					<h3>Step 4: Preview and submit model</h3>
+				</div>
+				<div class="content">
+					<div class="model-preview-box"></div>
+					<div class="code-error-box" data-status="notice"><pre>You need to test your model before saving it. The results of your test will appear here after pressing "Test model".</pre></div>
+					<div class="submit-buttons"><a data-action="submit" class="button disabled" title="Upload model to modelRxiv">Submit model</a></div>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -48,6 +68,7 @@
 <footer>
 	<div class="wrap">
 		<div class="col">
+			<p><a href="/help.html">How to upload models</a></p>
 			<p><a href="/terms.html">Terms of use</a></p>
 			<p><a href="/privacy.html">Privacy policy</a></p>
 		</div>
@@ -58,6 +79,7 @@
 		<div class="clear"></div>
 	</div>
 </footer>
+<div class="api-loading-overlay"></div>
 <script src="/apc/init.js"></script>
 </body>
 </html>
