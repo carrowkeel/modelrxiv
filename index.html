@@ -28,10 +28,13 @@
 				<h4>Category</h4>
 				<p><input type="checkbox" name="type" value="published" checked="checked"> Peer-reviewed (<span data-count="type:published">0</span>)</p>
 				<p><input type="checkbox" name="type" value="education" checked="checked"> Educational (<span data-count="type:education">0</span>)</p>
-				<p><input type="checkbox" name="type" value="unpublished,preprint" checked="checked"> Unpublished (<span data-count="type:unpublished">0</span>)</p>
+				<p><input type="checkbox" name="type" value="preprint" checked="checked"> Preprint (<span data-count="type:preprint">0</span>)</p>
+				<p><input type="checkbox" name="type" value="unpublished" checked="checked"> Unpublished (<span data-count="type:unpublished">0</span>)</p>
 				<h4>Visibility</h4>
 				<p><input type="checkbox" name="visibility" value="public" checked="checked"> Public (<span data-count="visibility:public">0</span>)</p>
 				<p><input type="checkbox" name="visibility" value="sandbox" checked="checked"> Sandbox (<span data-count="visibility:sandbox">0</span>)</p>
+				<h4>Contributions</h4>
+				<p><input type="checkbox" name="uploader" value="me"> My contributions</p>
 			</div>
 			<div class="model-list" data-empty="No models found"></div>
 		</div>
@@ -40,6 +43,7 @@
 <footer>
 	<div class="wrap">
 		<div class="col">
+			<p><a href="/help.html">How to upload models</a></p>
 			<p><a href="/terms.html">Terms of use</a></p>
 			<p><a href="/privacy.html">Privacy policy</a></p>
 		</div>
@@ -50,6 +54,7 @@
 		<div class="clear"></div>
 	</div>
 </footer>
+<div class="api-loading-overlay"></div>
 <script src="/apc/init.js"></script>
 </body>
 </html>
