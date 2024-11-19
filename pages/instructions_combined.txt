@@ -1,0 +1,96 @@
+modelRxiv is a platform for sharing publicly-available biological models. Models can be provided in a variety of formats, but to be compatible with modelRxiv, model code must confirm to a certain protocol, detailed below. This protocol has two parts: the *model code*, which must be in either Python or JavaScript (so that it runs in the browser), and a *model scheme*, which describes the model inputs (user-defined parameters) and outputs (plots, parameter presets and analyses).
+
+The model code must implement a step function that takes the model parameters (params), the previous step, and the time point (t), and returns the next step (models can be written in Python or JavaScript). The code can have other functions that can be called within the step function. The state of the model should not be maintained through globals but using the "last_step" variable as shown below.
+
+```python
+def step(params: dict, last_step: dict, t: int) -> dict: ## Contains the main model logic
+    ## Compute the next step given the last step and the model parameters
+    ## For example, return the next step of a population genetics model
+    if t == 0: ## When called the first time, return the initial step
+        return {'q': params['q0']}
+    q = last_step['q']
+    s = params['s']
+    h = params['h']
+    q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2)
+    return {'q': q_prime}
+```
+
+```javascript
+const step = (params, last_step, t) => { // Contains the main model logic
+    // Compute the next step given the last step and the model parameters
+    // For example, return the next step of a population genetics model
+    if (t === 0) { // When called the first time, return the initial step
+        return {'q': params['q0']};
+    }
+    let q = last_step['q'];
+    let s = params['s'];
+    let h = params['h'];
+    let q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2);
+    return {'q': q_prime};
+}
+```
+
+We also need a scheme that describes the model, such as listing its parameters, the plots of the model dynamics that will be generated, parameter presets, and the basic metadata. We can infer some of these attributes from the model code, looking at the parameters used (in `params`) and also at the dictionary that is returned by the step function to understand what we can plot. For instance, in the example below, we see that the parameters `s`, `h` and `q0` are used, while `q` is returned by the step function, allowing us to track `q` over time. We can also provide the user some examples of *presets* which are parameter combinations that give specific outcomes or dynamics. Consider the Python model code we saw above:
+
+```python
+def step(params: dict, last_step: dict, t: int) -> dict: ## Contains the main model logic
+    ## Compute the next step given the last step and the model parameters
+    ## For example, return the next step of a population genetics model
+    if t == 0: ## When called the first time, return the initial step
+        return {'q': params['q0']}
+    q = last_step['q']
+    s = params['s']
+    h = params['h']
+    q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2)
+    return {'q': q_prime}
+```
+
+An example scheme file we can write for this model is (the description part can be more elaborate):
+
+```text
+# Metadata
+title=Population genetics model
+description=The model tracks the frequency on an allele over time as it changes owing to selection
+authors=Joe Smith, Jane Doe
+doi=
+type=preprint
+publication_date=01-01-2020
+keywords=population-genetics
+framework=py
+
+# Parameter: s
+name=s
+description=Fitness cost of the allele
+value=0.5
+
+# Parameter: h
+name=h
+description=Dominance of the allele over the wild type allele
+value=1
+
+# Parameter: q_0
+name=q0
+description=Initial frequency of the allele
+
+# Parameter: Steps
+name=step_num
+description=Number of steps to run the model for
+value=100
+
+# Plot: Allele frequency
+type=line
+xlabel=Generations
+ylabel=Frequency
+xlim=0,step_num
+ylim=0,1
+x=t
+y=q
+
+# Preset: Fig. 1, Negative selection
+s=0.1
+h=0.5
+
+# Preset: Fig. 1, Positive selection
+s=-0.1
+h=0
+```

@@ -1,0 +1,9 @@
+# Metadata
+title=Title of model
+description=
+authors=The authors
+doi=
+type=unpublished
+publication_date=draft
+keywords=
+framework=py

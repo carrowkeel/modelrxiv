@@ -1,9 +1,9 @@
 # Metadata
-title=Population genetics model
-description=
+title=Example Population Genetics Model
+description=This scheme demonstrates how to use basic features of the scheme, including parameters, plots and presets
 authors=The authors
 doi=
-type=unpublished
+type=preprint
 publication_date=draft
 keywords=selection,population-genetics
 framework=py
@@ -11,27 +11,34 @@ framework=py
 # Parameter: s
 name=s
 description=Fitness cost of the allele
-value=0.01
+value=-0.25
 
 # Parameter: h
 name=h
 description=Dominance of the allele
 value=0.5
 
-# Parameter: q_0
+# Parameter: q0
 name=q0
 description=Initial allele frequency
-value=0.1
+value=0.01
 
-# Plot: Genetic dynamics
+# Plot: Genetic Dynamics
 type=line
 xlabel=Generations
 ylabel=Frequency
 x=t
 y=q
 
-# Preset: Weak selection
-s=0.001
+# Plot: Heterozygosity Over Time
+type=line
+xlabel=Generations
+ylabel=Heterozygosity
+x=t
+y=H
 
-# Preset: Strong selection
+# Preset: Positive selection
+s=-0.3
+
+# Preset: Negative selection
 s=0.1
