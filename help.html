@@ -21,7 +21,7 @@
 		<p>This page provides an overview of the process of uploading models, including details about implementing the modelRxiv protocol. Researchers are encouraged to upload their published or unpublished models to modelRxiv to allow a wider audience to access the model, manipulate parameters, and regenerate results. modelRxiv does not require that uploaded models be accepted at a peer-reviewed journal before uploading, but you must be allowed to make the model code publicly available (see our <a href="/terms.html" target="_blank">terms of use</a> for more information. To read more about the goals of the platform, see the <a target="_blank" href="https://www.biorxiv.org/content/10.1101/2022.02.16.480599v2.full">preprint</a>.</p>
 		<h2>Registration</h2>
 		<p>Before uploading a model, you will need to create an account and log in. This can be done by clicking on the "Login" button on the top right corner of the page, and opening the "Register" tab. Once you have created an account, you can login using your credentials on the Login dialog box.</p>
-		<div class="screenshot"><img src="/images/modelrxiv_register.png" alt="A screenshot of the open register dialog box on modelRxiv"></div>
+		<div class="screenshot"><img src="/images/mdx_register.png" alt="A screenshot of the open register dialog box on modelRxiv"></div>
 		<p>Once logged in, you will see an "Upload" button at the top right corner of the page.</p>
 		<h2>Upload page</h2>
 		<p>The upload page is designed to allow uploaders to paste their model code and gradually adapt it to modelRxiv, either by manually editing the code and testing it, or by using the AI-assisted features for code conversion. The upload process has four main steps:</p>
@@ -33,9 +33,12 @@
 		</ul>
 		<h2>Model code</h2>
 		<p>When you first open the upload page, you will see a blank textarea for your code. You can either provide code that conforms to the <a href="#protocol">modelRxiv protocol</a>, or use the AI-assisted pipeline to convert it (recommended). To see an example of a simple model that is compatible with modelRxiv to use as a template, click the "Load example" button at the bottom right of the textarea.</p>
-		<div class="screenshot"><img src="/images/modelrxiv_upload.png" alt="A screenshot of the model scheme and code boxes on the modelRxiv upload page, with an example model"></div>
+		<div class="screenshot"><img src="/images/mdx_upload1_example.png" alt="A screenshot of the model code box on the modelRxiv upload page, with an example model"></div>
 		<h2>Model scheme</h2>
-		<p>The model scheme describes your model to modelRxiv, including its parameters and visual outputs. This allows modelRxiv to provide the appropriate adjustable parameters to users, and to create dynamic plots based on the output of running the model code. You can also add descriptions to the scheme to help users understand your model. To demonstrate the scheme, we consider a simple model of selection:</p>
+		<p>The model scheme describes your model to modelRxiv, including its parameters and visual outputs. This allows modelRxiv to provide the appropriate adjustable parameters to users, and to create dynamic plots based on the output of running the model code. You can also add descriptions to the scheme to help users understand your model.</p>
+		<div class="screenshot"><img src="/images/mdx_upload2.png" alt="A screenshot of the model scheme box on the modelRxiv upload page, with an example model"></div>
+		<h3>Example model</h3>
+		<p>To demonstrate the scheme, we consider a simple model of selection:</p>
 		<div class="code-example" data-type="python">
 			<pre><code class="language-python">def step(params: dict, last_step: dict, t: int) -> dict:
     ## Compute the next step given the last step and the model parameters
@@ -66,9 +69,14 @@ framework=py</code></pre>
 			<pre><code class="language-ini"># Parameter: s
 name=s
 description=The relative fitness cost of the allele
-value=0.1</code></pre>
+value=0.1
+
+# Parameter: Steps
+name=step_num
+description=Number of steps to run the model for
+value=100</code></pre>
 		</div>
-		<p>This adds a parameter `s` with a default value `0.1` to the model, with the label "s". The label can also contain an underscore character `_` to use subscript formatting.</p>
+		<p>This adds a parameter `s` with a default value `0.1` to the model, with the label "s". The label can also contain an underscore character `_` to use subscript formatting. We also define a parameter `step_num`, which is a special parameter as it tells modelRxiv for how many steps to run the model. By default (without defining the parameter in the scheme), its value is 100.</p>
 		<p>Now that we have some model parameters, we can add plots. Plots take the output of the model code and connect them to a specific plot type. In the example below, we take the frequency of the allele from the model, the dynamic parameter `q`, and create a line plot for `q` over the time steps of the model:</p>
 		<div class="code-example" data-type="model scheme">
 			<pre><code class="language-ini"># Plot: Allele frequency over time
@@ -95,9 +103,10 @@ h=1</code></pre>
 		<p>You can add as many parameter definitions as you like to each preset. These will modify the existing user parameters and run the model, when clicked by a user.</p>
 		<h2>AI-assisted conversion pipeline</h2>
 		<p>The conversion pipeline was designed to reduce the effort required for integrating existing models with modelRxiv. It takes the model code and the current scheme text and attempts to convert the model code so that it is compatible, and create a scheme that matches parameters and plots described in the model code. By using this pipeline, you consent to the original model code being sent to servers of the LLM provider, and being retained on our servers for the purpose of improving our pipeline (see our <a target="_blank" href="/privacy.html">privacy policy</a> for more details).</p>
+		<div class="screenshot"><img src="/images/mdx_upload3.png" alt="A screenshot of the LLM interaction panel, showing an LLM response"></div>
 		<h2>Testing your model</h2>
 		<p>At any stage of uploading your model you can run a test to see that modelRxiv is correctly interpreting the scheme and producing the correct dynamics output. Errors that occur while attempting to run the model will be displayed in an error box in this section of the form. Here we test the example model we discussed above and generate model dynamics:</p>
-		<div class="screenshot"><img src="/images/modelrxiv_test.png" alt="A screenshot of a model test, showing the graphical output of the model"></div>
+		<div class="screenshot"><img src="/images/mdx_upload4.png" alt="A screenshot of a model test, showing the graphical output of the model"></div>
 		<h2>Model analyses</h2>
 		<p>modelRxiv is aimed at models that can generate dynamics visualizations on-the-fly rather than running computationally intensive analyses that might take hours or days. However, seeing as models may include results that do not fit the step-wise dynamics display, modelRxiv also allows uploaders to specify a function in their code that can generate a figure. Analyses run some code and return an image, or data that matches one of the visualizations on modelRxiv. For instance, we can use the `matplotlib` library to generate an image that will be displayed in the browser:</p>
 		<a name="matplotlib-example"></a><div class="code-example" data-type="python">
@@ -124,13 +133,13 @@ ylim=0,100</code></pre>
 		<div class="code-example" data-type="model scheme">
 			<pre><code class="language-ini"># Analysis: fixation_analysis_grid
 function=run_fixation_grid
-type=grayscale_2d
+type=mat_grayscale
 xlabel=s
 ylabel=h
 xlim=0,1
 ylim=0,1</code></pre>
 		</div>
-		<p>Note that the function `run_fixation_grid` must be defined in your code and return data that fits the `grayscale_2d` (grayscale matrix) plot. Below is an example of such a function that runs the model dynamics and returns a result of 0 or 1 for a grayscale matrix.</p>
+		<p>Note that the function `run_fixation_grid` must be defined in your code and return data that fits the `mat_grayscale` (grayscale matrix) plot. Below is an example of such a function that runs the model dynamics and returns a result of 0 or 1 for a grayscale matrix.</p>
 		<div class="code-example" data-type="python">
 			<pre><code class="language-python"># This function runs the model and returns 1 if the allele is close to fixation
 async def single_run(params):
@@ -152,8 +161,8 @@ async def run_fixation_grid(params):
 	param_sets = [{**params, 's': x_y[0], 'h': x_y[1]} for x_y in grid]
 	# Distribute grid computation
 	results = await distribute('single_run', param_sets)
-	grayscale_matrix = np.array(results).reshape(len(s), len(h)).tolist()
-	return grayscale_matrix</code></pre>
+	normalized_matrix = np.array(results).reshape(len(s), len(h)).tolist()
+	return normalized_matrix</code></pre>
 		</div>
 		<p>Note that we used the `distribute` function in order to compute the model results in parallel. This is handled by modelRxiv and ensures that computational resources are not overused by multiple analyses.</p>
 		<p>Now that we defined this analysis, we can also define presets that run it with different fixed parameters:</p>
@@ -169,7 +178,8 @@ q0=0.1</code></pre>
 		<p>When users click these presets, the grid will be computed by running the `run_fixation_grid` in your code. Users will see a progress bar on the preset while the result is being generated. We suggest avoiding analyses that take more than a few minutes to compute results (even with multi-threading), as users will likely navigate away from the page if the waiting time is too long.</p>
 		<a name="visualizations"></a><h2>Visualizations</h2>
 		<p>modelRxiv currently supports a number of plots for dynamics data. These plots are listed below. For analyses, it is possible to use the Python library <a href="https://matplotlib.org/stable/index.html" target="_blank">matplotlib</a>; figures generated in analysis functions using matplotlib (see the <a href="#matplotlib-example">example</a> above) will appear in the browser as images.</p>
-		<h3>Line plot</h3>
+		<h3>Line plot (`line`)</h3>
+		<p>This is the most common plot for time-series data. If the x-axis is set as `t`, which each step it updates one or more lines in the plot using the value of `y`.</p>
 		<div class="code-example" data-type="model scheme">
 			<pre><code class="language-ini"># Plot: Population size over time
 type=line
@@ -180,9 +190,8 @@ ylabel=Population size
 xlim=0,step_num
 ylim=0,K</code></pre>
 		</div>
-		<p>This plot takes output data from your step function, defined by `x=t` and `y=N`, and generates a line plot as the model runs. In this example, we also set limits for the axes using `xlim` and `ylim`. These fields take two numbers or parameter names separated by a comma. For `xlim`, we used `0,step_num`, meaning that the x-axis goes from 0 to the value of the `step_num` parameter, which is the parameter that tells modelRxiv how many iterations to run the dynamics for. For `ylim`, we used `0,K`, meaning that the y-axis goes from 0 to the value of a carrying capacity parameter `K`. This means that if the user updates these parameters, the plot limits will be updated. A step function that produces data for this plot might look like:</p>
+		<p>In this example, we also set limits for the axes using `xlim` and `ylim`. These fields take two numbers or parameter names separated by a comma. For `xlim`, we used `0,step_num`, meaning that the x-axis goes from 0 to the value of the `step_num` parameter, which is the parameter that tells modelRxiv how many iterations to run the dynamics for. For `ylim`, we used `0,K`, meaning that the y-axis goes from 0 to the value of a carrying capacity parameter `K`. This means that if the user updates these parameters, the plot limits will be updated. A step function that produces data for this plot might look like:</p>
 		<div class="code-example" data-type="python">
-			<a data-action="show-screenshot">show screenshot</a>
 			<pre><code class="language-python">def step(params, last_step, t):
 	K = params['K']
 	r = params['r']
@@ -191,12 +200,10 @@ ylim=0,K</code></pre>
 	N = last_step['N']
 	N_next = r * N * (1 - (N / K))
 	return {'N': N_next}</code></pre>
-			<div class="screenshot"><img src="/images/modelrxiv_lineplot1.png" alt="A screenshot of model dynamics using a line plot"></div>
 		</div>
 		<p>To be compatible with the line plot, `N` should be a number (it can be an int or a float). Note that while we need to return `N` for the dynamics plot, `t` does not need to be returned as it is provided to the dynamics plot by modelRxiv.</p>
 		<p>To plot multiple lines, for instance if we had multiple populations, you can use a comma to separate the names of the output parameters. In the example below, we also use the `legend` parameter to specify how the lines will be annotated (with indices as subscript).</p>
 		<div class="code-example" data-type="model scheme">
-			<a data-action="show-screenshot">show screenshot</a>
 			<pre><code class="language-ini"># Plot: Population size over time
 type=line
 x=t
@@ -206,9 +213,69 @@ ylabel=Population size
 xlim=0,step_num
 ylim=0,K
 legend=N_1,N_2</code></pre>
-			<div class="screenshot"><img src="/images/modelrxiv_lineplot2.png" alt="A screenshot of model dynamics using a line plot with two lines"></div>
 		</div>
-		<h3>Scatter plot</h3>
+		<h3>Multiple line plot (`lines`)</h3>
+		<p>This plot is designed for plotting lines that represent replicates in a stochastic simulation. For instance, it could be used to track allele counts and effective alleles of separate simulations of a drift model:</p>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Plot: Alleles
+type=lines
+xlabel=Generations
+ylabel=Alleles
+xlim=0,step_num
+ylim=1,20
+x=t
+y=alleles,effective_alleles</code></pre>
+		</div>
+		<p>The y-axis data includes two parameters, `alleles` and `effective_alleles`. These are assumed to be arrays that contain the values of the parameters in each of the repeats (for the current time step). For instance, `effective_alleles` could be `[1 / (1 - repeat['heterozygosity']) for repeat in repeats]`. Lines will be shown with low opacity, with one line representing the mean of all repeats with high opacity.</p>
+		<h3>Scatter plot (`scatter`)</h3>
+		<p>This plot is useful for dynamically displaying data with two dimensions, such as the position of objects moving in space, or the correlation between two attributes of an agent. In the example below, we track the movement of two overlapping species in 2-dimensional space.
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Plot: Position
+type=scatter
+xlabel=x
+ylabel=y
+xlim=0,100
+ylim=0,100
+data=species_1_position,species_2_position</code></pre>
+		</div>
+		<p>This assumes that `species_1_position` and `species_2_position` are arrays of 2-dimensional vectors. Because this data is updated at every step, we do not provide an x-axis input. Output provided using `data` will replace the contents of the plot with each time-step.</p>
+		<h3>2-dimensional network (`network_plot`)</h3>
+		<p>This plot is useful for representing a network with nodes and edges that updates at every time step, to visualize the distribution of change in nodes across the network. Nodes have coordinates and a value between 0 and 1 that defines their color. In the example below, we use this plot to represent the spread of an allele in a population structure, showing the allele frequency using the value of the node.</p>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Plot: Population structure
+type=network_plot
+xlabel=x
+ylabel=y
+xlim=0,100
+ylim=0,100
+data=nodes_edges
+legend=Low frequency,High frequency</code></pre>
+		</div>
+		<p>We use the `nodes_edges` output of the model for the plot: this is a tuple or array containing `nodes` and `edges`. `nodes` is an array of 3-dimensional vectors containing the 2-dimensional coordinates of the node and a value (e.g., a node at (34, 56) with an allele frequency of 0.5 would be `[34, 56, 0.5]`). `edges` is an array containing line coordinates. For instance `[[0, 1], [5, 6]]` draws an edge between (0, 1) and (5, 6). We can also indicate what the extremes of the color scale indicate using the `legend`. Importantly, the x- and y-axis limits should be set according to the maximal coordinate values of the nodes.</p>
+		<h3>2-dimensional matrix (`mat`)</h3>
+		<p>This plot is useful for visualizing filled matrixes. For instance, it could visualize changes across a landscape in a patch model. In this example, provide a matrix of patches directly to the plot. The values of the cells (normalized to between 0 and 1) will determine the color of the patch.</p>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Plot: Patches
+type=mat
+xlabel=x
+ylabel=y
+xlim=0,100
+ylim=0,100
+data=patches_matrix</code></pre>
+		</div>
+		<p>This plot is the equivalent of matplotlib's `imshow`. The x- and y-axis limits are provided here for display only since the input data does not contain coordinates. A grayscale equivalent of this plot is `mat_grayscale`.</p>
+		<h3>2-dimensional grid (`grid`)</h3>
+		<p>An alternative to the above plot, where we provide patches with coordinates (potentially not filling the entire grid) is `grid`:</p>
+		<div class="code-example" data-type="model scheme">
+			<pre><code class="language-ini"># Plot: Patches
+type=grid
+xlabel=x
+ylabel=y
+xlim=0,100
+ylim=0,100
+data=patches</code></pre>
+		</div>
+		<p>Here `patches` is an array of 3-dimensional vectors, the same as the input of `nodes` for the `network_plot` plot (i.e., each element of the array contains the coordinates of the patch and its value). As with `network_plot`, the x- and y-axis here scale the data, so it is important that they match the actual limits of the coordinates provided.</p>
 	</div>
 	<div class="clear"></div>
 	</div>
