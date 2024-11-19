@@ -28,12 +28,15 @@ const hooks = [
 ];
 
 const filterModels = (models, query) => {
+	const sandbox_models = models.filter(model => model.visibility === 'sandbox').map(model => model.model_id);
 	return models
 		.filter(model => {
 			if (query.search && !model.title.match(new RegExp(query.search, 'i')) && !model.description.match(new RegExp(query.search, 'i')))
 				return false;
+			if (query.uploader && (model.visibility !== 'public' || !sandbox_models.includes(model.model_id)))
+				return false;
 			for (const prop in query) {
-				if (['order', 'search'].includes(prop))
+				if (['order', 'search', 'uploader'].includes(prop))
 					continue;
 				if (Array.isArray(query[prop])) {
 					const cond = query[prop].map(value => value.split(',')).flat();
@@ -67,5 +70,5 @@ const updateList = async (container) => {
 
 export const init = async (container) => {
 	addHooks(window, hooks);
-	updateList(container);
+	await updateList(container);
 };
