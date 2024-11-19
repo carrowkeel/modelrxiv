@@ -1,4 +1,4 @@
-import { shortNotation, mathNotation, generateID, queryFromPath, replaceStrings, toCSV, errorBox } from '/apc/common.js';
+import { shortNotation, mathNotation, generateID, queryFromPath, replaceStrings, toCSV, errorBox, confirmBox } from '/apc/common.js';
 import { parametersForm, readForm } from '/apc/form.js';
 import { cacheString, getIDBObject } from '/apc/cache.js';
 import { initializePlots, updatePlots } from '/apc/plot.js';
@@ -9,10 +9,10 @@ const getCredentials = async (property) => {
 	return credentials[property];
 };
 
-const presetsText = (presets) => presets === undefined ? '' : presets.map(preset => `<div class="preset"><a data-preset="${preset.label}" title="${Object.entries(preset).map(([param, value]) => `${param}=${value}`).join('\n')}">${preset.label}</a></div>`).join('');
+const presetsText = (presets) => presets === undefined ? '' : presets.map(preset => `<div class="preset" data-type="${preset.analysis ? 'analysis' : 'dynamics'}"><a data-preset="${preset.label}" title="${preset.analysis ? 'Clicking this preset will run an analysis in your browser. To complete the analysis you will need to stay on this page. Note that analyses may take a few minutes to complete.' : Object.entries(preset).map(([param, value]) => `${param}=${value}`).join('\n')}">${preset.label}</a></div>`).join('');
 
-const defaultsFromScheme = (scheme) => {
-	return scheme.parameter ? Object.fromEntries(scheme.parameter.map(parameter => [parameter.name, parameter.value])) : {};
+export const defaultsFromScheme = (scheme) => {
+	return scheme.parameter ? Object.fromEntries(scheme.parameter.map(parameter => [parameter.name, parameter.value || parameter.default])) : {};
 };
 
 export const parseModelScheme = (model_id, scheme) => {
@@ -95,7 +95,7 @@ async def run(params):
 	}
 };
 
-const generatePlot = async (model_elem, scheme, preset) => {
+const generatePlot = (model_elem, scheme, preset) => new Promise(async resolve => {
 	const analysis = scheme.analysis.find(analysis => analysis.label === preset.analysis);
 	if (!analysis)
 		throw 'Analysis not defined in scheme';
@@ -106,17 +106,26 @@ const generatePlot = async (model_elem, scheme, preset) => {
 		if (request.request_id !== request_id || request.type !== 'result')
 			return;
 		const result = request.data;
-		const plots = formatPlots([Object.assign({}, analysis, {label: preset.label})], scheme.parameter);
+		const plots = formatPlots([Object.assign({}, analysis, {label: `${preset.label} (${generateID(4)})`, save: 'analysis'})], scheme.parameter);
 		initializePlots(model_elem.querySelector('.plots'), plots);
 		updatePlots(model_elem.querySelector('.plots'), plots, result, false);
+		resolve();
+	};
+	const handle_error = e => {
+		console.log(e);
+		errorBox('Failed to generate model results', 'An error was encountered while generating your results');
+		resolve();
 	};
 	model_elem.addEventListener('worker_response', handler);
-	model_elem.dispatchEvent(new CustomEvent('deploy', {detail: {request_id, script_uri: scheme.script_uri, function_name: analysis.function, framework: scheme.framework || 'py', params: parseNumeric(params)}}));
-};
+	model_elem.addEventListener('worker_error', handle_error);
+	model_elem.dispatchEvent(new CustomEvent('deploy', {detail: {request_id, script_uri: scheme.script_uri, function_name: analysis.function, libraries: scheme.libraries, framework: scheme.framework || 'py', params: parseNumeric(params)}}));
+});
 
 const runDynamics = async (model_elem, scheme, request_id, params) => {
 	const steps = [];
 	const cache_output = [];
+	if (!scheme.plot)
+		return;
 	const plots = formatPlots(scheme.plot, scheme.parameter, params);
 	const increment_step = t => {
 		model_elem.dispatchEvent(new CustomEvent('worker_message', {detail: {type: 'step', request_id, step: t}}));
@@ -142,7 +151,12 @@ const runDynamics = async (model_elem, scheme, request_id, params) => {
 		if (steps.length > 2)
 			steps.shift();
 		model_elem.dispatchEvent(new Event('data'));
-		updatePlots(model_elem, plots, steps, t === 0);
+		try {
+			updatePlots(model_elem, plots, steps, t === 0);
+		} catch (e) {
+			model_elem.dispatchEvent(new CustomEvent('error', {detail: {error: `Failed to update plots: ${e}`}}));
+			return;
+		}
 		if (model_elem.classList.contains('paused')) {
 			await new Promise(resolve => {
 				model_elem.addEventListener('run', e => resolve(), {once: true});
@@ -151,9 +165,16 @@ const runDynamics = async (model_elem, scheme, request_id, params) => {
 		await new Promise(resolve => setTimeout(resolve, 10));
 		increment_step(t >= (params['step_num'] || 100) ? false : ++t);
 	};
+	const handle_error = e => {
+		const response = e.detail;
+		const error = response.error;
+		model_elem.dispatchEvent(new Event('data'));
+		model_elem.dispatchEvent(new Event('complete'));
+	};
 	model_elem.addEventListener('worker_response', handler);
+	model_elem.addEventListener('worker_error', handle_error);
 	const script = await dynamicsScript(params, scheme.framework);
-	model_elem.dispatchEvent(new CustomEvent('deploy', {detail: {request_id, script, framework: scheme.framework || 'py', params}}));
+	model_elem.dispatchEvent(new CustomEvent('deploy', {detail: {request_id, script, libraries: scheme.libraries, framework: scheme.framework || 'py', params}}));
 };
 
 const parseNumeric = params => Object.fromEntries(Object.entries(params).map(([name, value]) => !isNaN(value) ? [name, +(value)] : [name, value]));
@@ -194,6 +215,17 @@ const hooks = scheme => [
 		e.target.closest('[data-module="model"]').dispatchEvent(new Event('run'));
 	}],
 	['[data-action="export"]', 'click', async e => {
+		// Determine if analysis or dynamics
+		const plot = e.target.closest('[data-plot]');
+		if (plot.dataset.save === 'analysis') {
+			const image_link = document.createElement('a');
+			image_link.href = plot.querySelector('canvas').toDataURL('image/png');
+			image_link.download = 'analysis_result.png'; // Use label
+			document.body.appendChild(image_link);
+			image_link.click();
+			document.body.removeChild(image_link);
+			return;
+		}
 		const instance = e.target.closest('[data-module="model"]').dataset.instance;
 		if (!instance)
 			throw 'Run dynamics before exporting data';
@@ -203,27 +235,50 @@ const hooks = scheme => [
 	['[data-action="edit"]', 'click', async e => {
 		window.location.href = `/edit/${scheme.model_id}`;
 	}],
+	['[data-action="copy"]', 'click', async e => {
+		if (await confirmBox('Copy model', 'Are you sure you want to create a copy of this model?') !== 1)
+			return;
+		document.body.classList.add('loading');
+		try {
+			const res = await fetch(`https://d.modelrxiv.org/submit_beta`, {method: 'POST', headers: {Authorization: `Basic ${await getCredentials('token')}`}, body: JSON.stringify({action: 'copy', model_id: scheme.model_id, framework: scheme.framework})});
+			if (!res.ok)
+				throw 'Request failed';
+			const response_data = await res.json();
+			window.location.href = `/sandbox/${response_data.model_id}`;
+		} catch (e) {
+			document.body.classList.remove('loading');
+			errorBox('Failed to copy model', 'An error was encountered while attempting to copy the model');
+		}
+	}],
 	['[data-action="publish"]', 'click', async e => {
+		if (await confirmBox('Publish model', 'This will submit your model to modelRxiv for review before being displaying publicly. Make sure your code is compliant with modelRxiv and works as expected before publishing. By clicking "Confirm", you declare that all model content (including the code and text details) can be publicly displayed on modelRxiv.') !== 1)
+			return;
+		document.body.classList.add('loading');
 		try {
 			const res = await fetch(`https://d.modelrxiv.org/submit_beta`, {method: 'POST', headers: {Authorization: `Basic ${await getCredentials('token')}`}, body: JSON.stringify({action: 'publish', model_id: scheme.model_id, framework: scheme.framework})});
 			if (!res.ok)
 				throw 'Request failed';
+			document.body.classList.remove('loading');
 			errorBox('Successfully submitted model', 'Your model will now be manually screened to assure that your code is compliant');
 		} catch (e) {
-			errorBox('Failed to publish model', 'An error was encountered submitting your model');
-			console.log('Failed to publish model:', e);
+			document.body.classList.remove('loading');
+			errorBox('Failed to publish model', 'An error was encountered submitting the model');
 		}
 	}],
 	['[data-action="parameters-menu"]', 'click', e => {
 		e.target.closest('[data-module="model"]').querySelector('.parameters-menu').classList.toggle('show');
 	}],
 	['[data-preset]', 'click', async e => {
+		if (e.target.parentElement.classList.contains('running'))
+			return;
 		const model_elem = e.target.closest('[data-module="model"]');
 		const preset = scheme.preset.find(preset => preset.label === e.target.dataset.preset);
 		Object.entries(preset).forEach(([param, value]) => model_elem.querySelector(`.parameters-menu [name="${param}"]`) ? model_elem.querySelector(`.parameters-menu [name="${param}"]`).value = value : 0);
-		if (preset.analysis)
-			generatePlot(model_elem, scheme, preset);
-		else
+		if (preset.analysis) {
+			e.target.parentElement.classList.add('running');
+			await generatePlot(model_elem, scheme, preset);
+			e.target.parentElement.classList.remove('running');
+		} else
 			model_elem.dispatchEvent(new Event('run'));
 	}]
 ];
@@ -241,9 +296,7 @@ const parseAxisLimits = (notation, plot_axis, scheme_parameters, user_parameters
 		});
 		return parts;
 	}
-	const axis_data_parameter = plot_axis ? plot_axis.split(',')[0] : '';
-	const axis_parameter = scheme_parameters.find(param => axis_data_parameter === param.name || (axis_data_parameter === 't' && param.name === 'step_num'));
-	return (axis_parameter ? (user_parameters && user_parameters[axis_parameter.name] ? [0, user_parameters[axis_parameter.name]] : [0, axis_parameter.value]) : default_value);
+	return default_value;
 };
 
 const formatPlots = (plots, scheme_parameters, user_parameters) => {
@@ -258,6 +311,8 @@ export const init = async (container, query_path=window.location.pathname) => {
 	const query = queryFromPath(query_path);
 	const model_id = query.code || query.sandbox || query.model;
 	const scheme = await fetch(`/${query.sandbox ? `user/${model_id}` : `models/${model_id}`}.txt`).then(res => res.text()).then(text => parseModelScheme(model_id, text));
+	if (!scheme.parameter)
+		throw 'Could not find any parameters in the model scheme. Check that the parameters were correctly formatted.';
 	const framework = scheme.framework || 'py';
 	if (query.code)
 		scheme.code = await fetch(`/models/${model_id}.${framework}`).then(res => res.text());
@@ -275,8 +330,9 @@ export const init = async (container, query_path=window.location.pathname) => {
 	container.querySelectorAll('.model-link').forEach(elem => elem.setAttribute('href', `/model/${model_id}`));
 	container.querySelectorAll('.code-link').forEach(elem => elem.setAttribute('href', `/code/${model_id}`));
 	addHooks(container, hooks(scheme));
-	if (!query.code) {
+	if (query.code)
+		return;
+	if (scheme.plot)
 		initializePlots(container.querySelector('.plots'), formatPlots(scheme.plot, scheme.parameter));
-		attachWorker(container);
-	}
+	attachWorker(container);
 };
