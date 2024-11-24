@@ -1,8 +1,9 @@
 
 const hooks = [
 	['[data-action="show-screenshot"]', 'click', e => {
-		e.target.closest('.code-example').querySelector('.screenshot').classList.toggle('show');
-	}],
+		console.log(e);
+		e.target.closest('.code-example').classList.toggle('show-screenshot');
+	}]
 ];
 
 const initializeTOC = (container) => {
@@ -81,5 +82,6 @@ const initializeTOC = (container) => {
 
 export const init = (container) => {
 	initializeTOC(container);
+	addHooks(container, hooks)
 	container.querySelector('.toc li').classList.add('selected');
 };
