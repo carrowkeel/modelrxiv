@@ -15,7 +15,7 @@
 </header>
 <div class="wrap">
 	<div class="main" data-module="submit">
-		<h2 class="upload-model-title">Upload model</h2>
+		<h2 class="upload-model-title"><a data-icon="?" class="fright" target="_blank" href="/help.html">Help</a>Upload model</h2>
 		<p>To upload a model to modelRxiv, you will need to prepare the model code so that it conforms to the modelRxiv protocol, or use the AI-assisted conversion pipeline. For a detailed tutorial on uploading models with examples, see the <a href="/help.html" target="_blank">help page</a>.</p>
 		<div class="submission-form form wide-form">
 			<div class="section code-step hidden">
@@ -49,6 +49,7 @@
 				<div class="content">
 					<div class="llm-response-box"><pre>The text part of the LLM response will appear here after you run the conversion pipeline.</pre></div>
 					<div class="user-llm-comments"><textarea placeholder="Comments for the AI-assisted conversion pipeline (e.g., plots missing, dynamics output incorrect)"></textarea></div>
+					<div class="submit-buttons"><a data-icon="G" data-action="convert-code" class="button" title="Use an LLM to make your code compatible with modelRxiv (this will attempt to convert your code to Python if it is not written in Python or JavaScript)">Convert/fix code</a></div>
 				</div>
 			</div>
 			<div class="section testing-step hidden">
@@ -59,9 +60,10 @@
 				<div class="content">
 					<div class="model-preview-box"></div>
 					<div class="code-error-box" data-status="notice"><pre>You need to test your model before saving it. The results of your test will appear here after pressing "Test model".</pre></div>
-					<div class="submit-buttons"><a data-action="submit" class="button disabled" title="Upload model to modelRxiv">Submit model</a></div>
+					<div class="submit-buttons"><a data-action="submit" class="button disabled" title="Upload to modelRxiv as a Sandbox model">Save model</a></div>
 				</div>
 			</div>
+			<div class="vertical-scroll-gap"></div>
 		</div>
 	</div>
 </div>
