@@ -26,7 +26,7 @@ const helper_form_structure = {
 	],
 	'Plot': [
 		{type: 'text', name: 'label', label: 'Label', value: '', placeholder: 'Plot label', required: true},
-		{type: 'select', name: 'type', label: 'Type', value: 'line', values: ['line', 'scatter', 'space_2d'], placeholder: 'Type of plot (default: line)', required: true},
+		{type: 'select', name: 'type', label: 'Type', value: 'line', values: ['line', 'lines', 'scatter', 'network_plot', 'mat', 'mat_grayscale', 'grid'], placeholder: 'Type of plot (default: line)', required: true},
 		{type: 'text', name: 'x', label: 'x-axis input', value: '', placeholder: 'Name of output parameter for x-axis (comma-separated for multiple)', required: true},
 		{type: 'text', name: 'y', label: 'y-axis input', value: '', placeholder: 'Name of output parameter for y-axis (comma-separated for multiple)', required: false},
 		{type: 'text', name: 'data', label: 'Data input', value: '', placeholder: 'Name of output parameter for both axes', required: false},
@@ -119,6 +119,8 @@ const hooks = (query, scheme, elem, timeouts) => [
 		const code_content = form.querySelector('.code [data-tab-content].selected textarea').value;
 		getIDBObject('mdx', 'tabs', 'draft_scheme', scheme_content);
 		getIDBObject('mdx', 'tabs', 'draft_code', code_content);
+		e.target.classList.add('success');
+		setTimeout(() => e.target.classList.remove('success'), 1000);
 	}],
 	['[data-action="clear-form"]', 'click', async e => {
 		const form = e.target.closest('.form');
@@ -154,7 +156,6 @@ const hooks = (query, scheme, elem, timeouts) => [
 		const type = form.dataset.type;
 		const form_structure = helper_form_structure[type];
 		const form_data = readForm(form);
-		console.log(form_data);
 		for (const field of form_structure)
 			if (field.required && !form_data[field.name])
 				form.querySelector(`[name="${field.name}"]`).classList.add('error');
@@ -206,6 +207,7 @@ const hooks = (query, scheme, elem, timeouts) => [
 		if (e.target.classList.contains('loading'))
 			return;
 		const form = e.target.closest('.form');
+		e.target.closest('.section').classList.remove('hidden');
 		const scheme_textarea = form.querySelector('.scheme [data-tab-content].selected textarea');
 		const code_textarea = form.querySelector('.code [data-tab-content].selected textarea');
 		const user_comments_textarea = form.querySelector('.user-llm-comments textarea');
@@ -214,11 +216,10 @@ const hooks = (query, scheme, elem, timeouts) => [
 			elem.classList.add('loading');
 		});
 		form.querySelector('[data-action="submit"]').classList.add('disabled');
-		e.target.closest('.section').classList.remove('hidden');
 		document.querySelectorAll('[data-action="convert-code"]').forEach(item => item.classList.add('loading'));
 		const scheme = scheme_textarea.value;
 		const code = code_textarea.value;
-		const code_error = form.querySelector('.code-error-box pre.error')?.innerText || '';
+		const code_error = form.querySelector('.code-error-box[data-status="error"] pre')?.innerText || '';
 		const user_comments = user_comments_textarea.value || '';
 		await queryLLM(form, scheme, code, code_error, user_comments);
 		user_comments_textarea.value = '';
@@ -239,6 +240,10 @@ const hooks = (query, scheme, elem, timeouts) => [
 		error_box.innerHTML = '';
 		form.querySelector('[data-action="submit"]').classList.add('disabled');
 		test_button.closest('.section').classList.remove('hidden');
+		window.scrollTo({
+			top: test_button.closest('.section').offsetTop - 20,
+			behavior: 'smooth'
+		});
 		const scheme_text = form.querySelector('.scheme [data-tab-content].selected textarea').value;
 		const code_text = form.querySelector('.code [data-tab-content].selected textarea').value;
 		if (code_text === '') {
@@ -337,6 +342,7 @@ export const init = async (elem) => {
 	const scheme = model_id ? parseModelScheme(model_id, scheme_text) : {};
 	if (model_id) {
 		elem.querySelector('.upload-model-title').innerHTML = `<a class="fright button" href="/sandbox/${model_id}">Back</a><a class="fright button" data-action="delete">Delete</a>Editing sandbox model`;
+		elem.querySelector('[data-action="save-draft"]').remove();
 		const framework = scheme.framework || 'py';
 		const code = await fetch(`/user/${model_id}.${framework}`, {cache: 'reload'}).then(res => res.text());
 		await addCodeBox('scheme', generateID(6), 'Current version', scheme_text);
