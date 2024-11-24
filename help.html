@@ -32,7 +32,7 @@
 			<li>Testing your model to assure that it works and is compatible with modelRxiv. Once you have successfully tested the model, it can be uploaded.</li>
 		</ul>
 		<h2>Model code</h2>
-		<p>When you first open the upload page, you will see a blank textarea for your code. You can either provide code that conforms to the <a href="#protocol">modelRxiv protocol</a>, or use the AI-assisted pipeline to convert it (recommended). To see an example of a simple model that is compatible with modelRxiv to use as a template, click the "Load example" button at the bottom right of the textarea.</p>
+		<p>When you first open the upload page, you will see a blank text box for your code. You can either provide code that conforms to the <a href="#protocol">modelRxiv protocol</a>, or use the AI-assisted pipeline to convert it (recommended). To see an example of a simple model that is compatible with modelRxiv to use as a template, click the "Load example" button at the bottom right of the text box.</p>
 		<div class="screenshot"><img src="/images/mdx_upload1_example.png" alt="A screenshot of the model code box on the modelRxiv upload page, with an example model"></div>
 		<h2>Model scheme</h2>
 		<p>The model scheme describes your model to modelRxiv, including its parameters and visual outputs. This allows modelRxiv to provide the appropriate adjustable parameters to users, and to create dynamic plots based on the output of running the model code. You can also add descriptions to the scheme to help users understand your model.</p>
@@ -41,8 +41,8 @@
 		<p>To demonstrate the scheme, we consider a simple model of selection:</p>
 		<div class="code-example" data-type="python">
 			<pre><code class="language-python">def step(params: dict, last_step: dict, t: int) -> dict:
-    ## Compute the next step given the last step and the model parameters
-    if t == 0: ## When called the first time, return the initial frequency
+    # Compute the next step given the last step and the model parameters
+    if t == 0: # When called the first time, return the initial frequency
         return {'q': params['q0']}
     q = last_step['q']
     s = params['s']
@@ -103,10 +103,12 @@ h=1</code></pre>
 		<p>You can add as many parameter definitions as you like to each preset. These will modify the existing user parameters and run the model, when clicked by a user.</p>
 		<h2>AI-assisted conversion pipeline</h2>
 		<p>The conversion pipeline was designed to reduce the effort required for integrating existing models with modelRxiv. It takes the model code and the current scheme text and attempts to convert the model code so that it is compatible, and create a scheme that matches parameters and plots described in the model code. By using this pipeline, you consent to the original model code being sent to servers of the LLM provider, and being retained on our servers for the purpose of improving our pipeline (see our <a target="_blank" href="/privacy.html">privacy policy</a> for more details).</p>
-		<div class="screenshot"><img src="/images/mdx_upload3.png" alt="A screenshot of the LLM interaction panel, showing an LLM response"></div>
+		<p>Below is an example of the text response of the AI-assisted conversion pipeline. Under the response is a comments box where you can add additional comments for the conversion pipeline. By default, any errors that appear while testing the model (see below) will be passed to the conversion pipeline. The comments box allows you to add additional comments, such as adjustments of the visualization of the dynamics, that will be sent to the conversion pipeline along with the code, scheme and any errors.</p>
+		<div class="screenshot"><img src="/images/mdx_upload3.png" alt="A screenshot of the AI-assisted conversion pipeline section, showing the text part of the response"></div>
 		<h2>Testing your model</h2>
 		<p>At any stage of uploading your model you can run a test to see that modelRxiv is correctly interpreting the scheme and producing the correct dynamics output. Errors that occur while attempting to run the model will be displayed in an error box in this section of the form. Here we test the example model we discussed above and generate model dynamics:</p>
 		<div class="screenshot"><img src="/images/mdx_upload4.png" alt="A screenshot of a model test, showing the graphical output of the model"></div>
+		<p>The model passed the test, and we can now upload the model by clicking "Submit". If there is a problem with the dynamics, we can either fix the code and scheme manually, or add a comment in the comments box within the AI-assisted conversion pipeline section of the upload form (as explained in the section above). If you receive an error when testing the model, clicking "Convert/fix" will send the error together with any comments you added to the conversion pipeline.</p>
 		<h2>Model analyses</h2>
 		<p>modelRxiv is aimed at models that can generate dynamics visualizations on-the-fly rather than running computationally intensive analyses that might take hours or days. However, seeing as models may include results that do not fit the step-wise dynamics display, modelRxiv also allows uploaders to specify a function in their code that can generate a figure. Analyses run some code and return an image, or data that matches one of the visualizations on modelRxiv. For instance, we can use the `matplotlib` library to generate an image that will be displayed in the browser:</p>
 		<a name="matplotlib-example"></a><div class="code-example" data-type="python">
@@ -181,6 +183,7 @@ q0=0.1</code></pre>
 		<h3>Line plot (`line`)</h3>
 		<p>This is the most common plot for time-series data. If the x-axis is set as `t`, which each step it updates one or more lines in the plot using the value of `y`.</p>
 		<div class="code-example" data-type="model scheme">
+			<a data-action="show-screenshot">show screenshot</a>
 			<pre><code class="language-ini"># Plot: Population size over time
 type=line
 x=t
@@ -189,13 +192,14 @@ xlabel=Generations
 ylabel=Population size
 xlim=0,step_num
 ylim=0,K</code></pre>
+			<div class="screenshot"><img src="/images/mdx_plot_line1.png" alt="A screenshot of model dynamics using a line plot"></div>
 		</div>
 		<p>In this example, we also set limits for the axes using `xlim` and `ylim`. These fields take two numbers or parameter names separated by a comma. For `xlim`, we used `0,step_num`, meaning that the x-axis goes from 0 to the value of the `step_num` parameter, which is the parameter that tells modelRxiv how many iterations to run the dynamics for. For `ylim`, we used `0,K`, meaning that the y-axis goes from 0 to the value of a carrying capacity parameter `K`. This means that if the user updates these parameters, the plot limits will be updated. A step function that produces data for this plot might look like:</p>
 		<div class="code-example" data-type="python">
 			<pre><code class="language-python">def step(params, last_step, t):
 	K = params['K']
 	r = params['r']
-	if t == 0 or not last_step:
+	if not last_step:
 		return {'N': params['K'] / 2} # Set initial population size
 	N = last_step['N']
 	N_next = r * N * (1 - (N / K))
@@ -204,6 +208,7 @@ ylim=0,K</code></pre>
 		<p>To be compatible with the line plot, `N` should be a number (it can be an int or a float). Note that while we need to return `N` for the dynamics plot, `t` does not need to be returned as it is provided to the dynamics plot by modelRxiv.</p>
 		<p>To plot multiple lines, for instance if we had multiple populations, you can use a comma to separate the names of the output parameters. In the example below, we also use the `legend` parameter to specify how the lines will be annotated (with indices as subscript).</p>
 		<div class="code-example" data-type="model scheme">
+			<a data-action="show-screenshot">show screenshot</a>
 			<pre><code class="language-ini"># Plot: Population size over time
 type=line
 x=t
@@ -213,69 +218,177 @@ ylabel=Population size
 xlim=0,step_num
 ylim=0,K
 legend=N_1,N_2</code></pre>
+			<div class="screenshot"><img src="/images/mdx_plot_line2.png" alt="A screenshot of model dynamics using a line plot with two lines"></div>
 		</div>
 		<h3>Multiple line plot (`lines`)</h3>
-		<p>This plot is designed for plotting lines that represent replicates in a stochastic simulation. For instance, it could be used to track allele counts and effective alleles of separate simulations of a drift model:</p>
+		<p>This plot is designed for plotting lines that represent replicates in a stochastic simulation. For instance, it could be used to track allele frequency of separate simulations of a drift model:</p>
 		<div class="code-example" data-type="model scheme">
-			<pre><code class="language-ini"># Plot: Alleles
+			<a data-action="show-screenshot">show screenshot</a>
+			<pre><code class="language-ini"># Plot: Allele frequency in repeats
 type=lines
 xlabel=Generations
-ylabel=Alleles
+ylabel=Frequency
 xlim=0,step_num
-ylim=1,20
+ylim=0,1
 x=t
-y=alleles,effective_alleles</code></pre>
+y=q</code></pre>
+			<div class="screenshot"><img src="/images/mdx_plot_lines.png" alt="A screenshot of model dynamics using a lines plot for displaying repeats"></div>
 		</div>
-		<p>The y-axis data includes two parameters, `alleles` and `effective_alleles`. These are assumed to be arrays that contain the values of the parameters in each of the repeats (for the current time step). For instance, `effective_alleles` could be `[1 / (1 - repeat['heterozygosity']) for repeat in repeats]`. Lines will be shown with low opacity, with one line representing the mean of all repeats with high opacity.</p>
+		<p>The y-axis data includes the `q` parameter. To be compatible, `q` should be an array of allele frequencies. Lines will be shown with low opacity, with one line representing the mean of all repeats with high opacity. Here is an example `step` function that returns values compatible with this plot:</p>
+		<div class="code-example" data-type="python">
+			<pre><code class="language-python">def step(params, last_step, t):
+	repeats = params['repeats']
+	N = params['N']
+	if not last_step:
+		return {'q': np.full(repeats, 0.5)} # Start all simulations at q=0.5
+	q = np.array(last_step['q'])
+	q_next = np.random.binomial(N, q, size=len(q)) / N # Drift
+	return {'q': q_next}</code></pre>
+		</div>
 		<h3>Scatter plot (`scatter`)</h3>
-		<p>This plot is useful for dynamically displaying data with two dimensions, such as the position of objects moving in space, or the correlation between two attributes of an agent. In the example below, we track the movement of two overlapping species in 2-dimensional space.
+		<p>This plot is useful for dynamically displaying data with two dimensions, such as the position of objects moving in space, or the correlation between two attributes of an agent. In the example below, we track the movement of two overlapping populations in 2-dimensional space.
 		<div class="code-example" data-type="model scheme">
-			<pre><code class="language-ini"># Plot: Position
+			<a data-action="show-screenshot">show screenshot</a>
+			<pre><code class="language-ini"># Plot: Population movement
 type=scatter
-xlabel=x
-ylabel=y
 xlim=0,100
 ylim=0,100
-data=species_1_position,species_2_position</code></pre>
+data=pop1,pop2</code></pre>
+			<div class="screenshot"><img src="/images/mdx_plot_scatter.png" alt="A screenshot of model dynamics using a scatter plot to display the movement of two populations of individuals"></div>
 		</div>
-		<p>This assumes that `species_1_position` and `species_2_position` are arrays of 2-dimensional vectors. Because this data is updated at every step, we do not provide an x-axis input. Output provided using `data` will replace the contents of the plot with each time-step.</p>
-		<h3>2-dimensional network (`network_plot`)</h3>
-		<p>This plot is useful for representing a network with nodes and edges that updates at every time step, to visualize the distribution of change in nodes across the network. Nodes have coordinates and a value between 0 and 1 that defines their color. In the example below, we use this plot to represent the spread of an allele in a population structure, showing the allele frequency using the value of the node.</p>
+		<p>The inputs `pop1` and `pop1` are arrays containing the 2-dimensional coordinates of the agents in each population. Note that we use `data` instead of `x` and `y` to provide data to the plot: output provided using `data` will replace the contents of the plot with each time-step. Below is example code that works with the above scheme:</p>
+		<div class="code-example" data-type="python">
+			<pre><code class="language-python">def step(params: dict, last_step: dict, t: int) -> dict:
+	N = params['N']
+	if t == 0:
+		# Random initial coordinates
+		pop1 = np.random.choice(100, (N, 2))
+		pop2 = np.random.choice(100, (N, 2))
+		return {'pop1': pop1, 'pop2': pop2}
+	# Update agent coordinates using random steps multipled by step size
+	pop1_next = np.array(last_step['pop1']) + np.random.choice([-1, 1], size=(N, 2)) * params['move_size_1']
+	pop2_next = np.array(last_step['pop2']) + np.random.choice([-1, 1], size=(N, 2)) * params['move_size_2']
+	return {'pop1': pop1_next, 'pop2': pop2_next}</code></pre>
+		</div>
+		<h3>2-dimensional matrix (`mat`)</h3>
+		<p>This plot is useful for visualizing patches. For instance, it could visualize changes across a landscape or population structure. In this example, we provide a matrix of alleles frequencies `q` directly to the plot using `data`. The values of the cells in the matrix (normalized to between 0 and 1) will determine the color of the patch. Not that the x- and y-axis limits here are for display only.</p>
 		<div class="code-example" data-type="model scheme">
+			<a data-action="show-screenshot">show screenshot</a>
+			<pre><code class="language-ini"># Plot: Patches
+type=mat
+xlim=0,1
+ylim=0,1
+data=q
+legend=Low frequency,High frequency</code></pre>
+			<div class="screenshot"><img src="/images/mdx_plot_mat.png" alt="A screenshot of model dynamics using a matrix plot to visualize changes in allele frequency across patches connected by gene flow"></div>
+		</div>
+		<p>This plot is the equivalent of matplotlib's `imshow`. The x- and y-axis limits are provided here for display only since the input data does not contain coordinates. A grayscale equivalent of this plot is `mat_grayscale`. Below is an example model of gene flow and drift in a stepping-stone population structure, which uses the `mat` plot above to visualize the distribution of allele frequencies across patches:</p>
+		<div class="code-example" data-type="python">
+			<pre><code class="language-python">def migration_matrix_from_edge_matrix(params, edge_matrix):
+	n = edge_matrix.shape[0]
+	M = edge_matrix * params['m']
+	M[range(n), range(n)] = 0
+	M[range(n), range(n)] = 1 - np.sum(M, axis=1)
+	return M
+
+def generate_graph_from_grid(grid_size):
+	mat_size = grid_size**2
+	M = np.zeros([mat_size, mat_size])
+	main_diag = np.diag_indices(mat_size, 2)
+	d1 = np.array([main_diag[0][:-1], main_diag[1][1:]]).T
+	d2 = np.array([main_diag[0][:-grid_size], main_diag[1][grid_size:]]).T
+	M[d1[:,0], d1[:,1]] = 1
+	M[d2[:,0], d2[:,1]] = 1
+	M[d1[:,0][grid_size-1::grid_size], d1[:,1][grid_size-1::grid_size]] = 0
+	return M + M.T
+
+def step(params, last_step, t):
+	grid_size = params['grid_size']
+	if not last_step:
+		q = np.full((grid_size, grid_size), 0.5)
+		return {'q': q, 'patches': np.zeros((0, 3))}
+	edge_matrix = generate_graph_from_grid(grid_size)
+	M = migration_matrix_from_edge_matrix(params, edge_matrix)
+	q_migration = np.dot(np.array(last_step['q']).reshape(grid_size**2), M)
+	q_drift = np.random.binomial(params['N'], q_migration, size=len(q_migration)) / params['N']
+	q_matrix = q_drift.reshape(grid_size, grid_size)
+	not_fixed_indices = np.where((q_matrix > 0.01) & (q_matrix < 0.99))
+	patches = np.array([*not_fixed_indices, q_matrix[not_fixed_indices]]).T
+	return {'q': q_matrix, 'patches': patches}</code></pre>
+		</div>
+		<h3>2-dimensional grid (`grid`)</h3>
+		<p>If you want to specify the coordinates of the patches (potentially not filling the entire grid) you can use `grid` instead. The input must now specify the coordinates and the value of patches, and the x- and y-axis limits in the scheme will determine the position of the data points. For the scheme we provide `patches` instead of `q`. We provided the `patches` output that fits this plot in the code above. To demonstrate, we display only patches that are not fixed for either allele.</p>
+		<div class="code-example" data-type="model scheme">
+			<a data-action="show-screenshot">show screenshot</a>
+			<pre><code class="language-ini"># Plot: Patches without fixed
+type=grid
+xlabel=x
+ylabel=y
+xlim=0,grid_size
+ylim=0,grid_size
+data=patches
+legend=Low frequency,High frequency</code></pre>
+			<div class="screenshot"><img src="/images/mdx_plot_grid.png" alt="A screenshot of model dynamics using a grid plot to visualize changes in allele frequency across patches connected by gene flow"></div>
+		</div>
+		<p>Here `patches` is an array of 3-dimensional vectors, the same as the input of `nodes` for the `network_plot` plot (i.e., each element of the array contains the coordinates of the patch and its value). As with `network_plot`, the x- and y-axis here scale the data, so it is important that they match the actual limits of the coordinates provided.</p>
+		<h3>2-dimensional network (`network_plot`)</h3>
+		<p>This plot is useful for representing a network with nodes and edges that updates at every time step, to visualize the distribution of change in nodes across the network. Nodes have coordinates and a value between 0 and 1 that defines their color. This can be used to visualize various network structures; here we repeat the example from above (in the `mat` plot) to demonstrate its use.</p>
+		<div class="code-example" data-type="model scheme">
+			<a data-action="show-screenshot">show screenshot</a>
 			<pre><code class="language-ini"># Plot: Population structure
 type=network_plot
 xlabel=x
 ylabel=y
-xlim=0,100
-ylim=0,100
+xlim=0,1
+ylim=0,1
 data=nodes_edges
 legend=Low frequency,High frequency</code></pre>
+			<div class="screenshot"><img src="/images/mdx_plot_network.png" alt="A screenshot of model dynamics using a network plot to show nodes and edges (representing populations and gene flow, respectively), with the color of nodes representing the allele frequency in the population"></div>
 		</div>
-		<p>We use the `nodes_edges` output of the model for the plot: this is a tuple or array containing `nodes` and `edges`. `nodes` is an array of 3-dimensional vectors containing the 2-dimensional coordinates of the node and a value (e.g., a node at (34, 56) with an allele frequency of 0.5 would be `[34, 56, 0.5]`). `edges` is an array containing line coordinates. For instance `[[0, 1], [5, 6]]` draws an edge between (0, 1) and (5, 6). We can also indicate what the extremes of the color scale indicate using the `legend`. Importantly, the x- and y-axis limits should be set according to the maximal coordinate values of the nodes.</p>
-		<h3>2-dimensional matrix (`mat`)</h3>
-		<p>This plot is useful for visualizing filled matrixes. For instance, it could visualize changes across a landscape in a patch model. In this example, provide a matrix of patches directly to the plot. The values of the cells (normalized to between 0 and 1) will determine the color of the patch.</p>
-		<div class="code-example" data-type="model scheme">
-			<pre><code class="language-ini"># Plot: Patches
-type=mat
-xlabel=x
-ylabel=y
-xlim=0,100
-ylim=0,100
-data=patches_matrix</code></pre>
+		<p>We use the `nodes_edges` output of the model for the plot, which contains the position of the nodes in the grid and their value (in this case, their allele frequency), and the edges between nodes. We can also indicate what the extremes of the color scale indicate using the `legend`. Importantly, the x- and y-axis limits should be set according to the maximal coordinate values of the nodes. The example code below is the same as for the `grid` plot, only that now we also specify edges to be draw on the plot.</p>
+		<div class="code-example" data-type="python">
+			<pre><code class="language-python">def migration_matrix_from_edge_matrix(params, edge_matrix):
+	n = edge_matrix.shape[0]
+	M = edge_matrix * params['m']
+	M[range(n), range(n)] = 0
+	M[range(n), range(n)] = 1 - np.sum(M, axis=1)
+	return M
+
+def lines_from_edge_matrix(edge_matrix, nodes):
+	if len(nodes) == 0:
+		return []
+	indices = np.triu_indices(edge_matrix.shape[0], k=1)
+	edges = np.array(indices).T[edge_matrix[indices] > 0.0001]
+	lines = nodes[edges]
+	return lines
+
+def generate_graph_from_grid(grid_size):
+	mat_size = grid_size**2
+	M = np.zeros([mat_size, mat_size])
+	main_diag = np.diag_indices(mat_size, 2)
+	d1 = np.array([main_diag[0][:-1], main_diag[1][1:]]).T
+	d2 = np.array([main_diag[0][:-grid_size], main_diag[1][grid_size:]]).T
+	M[d1[:,0], d1[:,1]] = 1
+	M[d2[:,0], d2[:,1]] = 1
+	M[d1[:,0][grid_size-1::grid_size], d1[:,1][grid_size-1::grid_size]] = 0
+	nodes = 0.5 / grid_size + np.indices((grid_size, grid_size)).T.reshape(grid_size**2, 2) / grid_size
+	return M + M.T, nodes
+
+def step(params, last_step, t):
+	edge_matrix, nodes = generate_graph_from_grid(params['grid_size'])
+	edges = lines_from_edge_matrix(edge_matrix, nodes)
+	M = migration_matrix_from_edge_matrix(params, edge_matrix)
+	if not last_step:
+		q = np.full(M.shape[0], 0.5)
+		nodes_q = np.insert(nodes, 2, q, axis=1)
+		return {'q': q, 'nodes_edges': [nodes_q, edges]}
+	q_migration = np.dot(last_step['q'], M)
+	q_drift = np.random.binomial(params['N'], q_migration, size=len(q_migration)) / params['N']
+	nodes_q = np.insert(nodes, 2, q_drift, axis=1)
+	return {'q': q_drift, 'nodes_edges': [nodes_q, edges]}</code></pre>
 		</div>
-		<p>This plot is the equivalent of matplotlib's `imshow`. The x- and y-axis limits are provided here for display only since the input data does not contain coordinates. A grayscale equivalent of this plot is `mat_grayscale`.</p>
-		<h3>2-dimensional grid (`grid`)</h3>
-		<p>An alternative to the above plot, where we provide patches with coordinates (potentially not filling the entire grid) is `grid`:</p>
-		<div class="code-example" data-type="model scheme">
-			<pre><code class="language-ini"># Plot: Patches
-type=grid
-xlabel=x
-ylabel=y
-xlim=0,100
-ylim=0,100
-data=patches</code></pre>
-		</div>
-		<p>Here `patches` is an array of 3-dimensional vectors, the same as the input of `nodes` for the `network_plot` plot (i.e., each element of the array contains the coordinates of the patch and its value). As with `network_plot`, the x- and y-axis here scale the data, so it is important that they match the actual limits of the coordinates provided.</p>
+		<h2>Feedback</h2>
+		<p>This help page will gradually expand as we develop more types of plots, and improve the clarity and flexibility of the model scheme. You can provide feedback about modelRxiv features by sending an email to help@modelrxiv.org.</p>
 	</div>
 	<div class="clear"></div>
 	</div>
