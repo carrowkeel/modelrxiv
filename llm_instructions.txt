@@ -1,0 +1,662 @@
+# Instructions for Large Language Models (LLMs) to Ensure Model Compatibility with modelRxiv
+
+This guide provides comprehensive instructions for Large Language Models (LLMs) to transform and adapt research models, ensuring their compatibility with **modelRxiv**. The focus is exclusively on processing the **model code** and **model scheme**, excluding any user interface interactions or non-essential content.
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Processing Model Code](#processing-model-code)
+3. [Structuring the Model Scheme](#structuring-the-model-scheme)
+   - [Metadata Section](#metadata-section)
+   - [Parameter Definitions](#parameter-definitions)
+   - [Adding Visualizations](#adding-visualizations)
+   - [Defining Parameter Presets](#defining-parameter-presets)
+4. [AI-assisted Conversion Pipeline](#ai-assisted-conversion-pipeline)
+5. [Testing Model Compatibility](#testing-model-compatibility)
+6. [Implementing Model Analyses](#implementing-model-analyses)
+   - [Example: Generating a Grid Plot](#example-generating-a-grid-plot)
+   - [Example: Fixation Analysis Grid](#example-fixation-analysis-grid)
+7. [Supported Visualizations](#supported-visualizations)
+   - [Line Plot (`line`)](#line-plot-line)
+   - [Multiple Line Plot (`lines`)](#multiple-line-plot-lines)
+   - [Scatter Plot (`scatter`)](#scatter-plot-scatter)
+   - [2-dimensional Matrix (`mat`)](#2-dimensional-matrix-mat)
+   - [2-dimensional Grid (`grid`)](#2-dimensional-grid-grid)
+   - [2-dimensional Network (`network_plot`)](#2-dimensional-network-network_plot)
+8. [Best Practices](#best-practices)
+9. [Feedback](#feedback)
+
+---
+
+## Overview
+
+The primary objective is to prepare and adapt research models so they adhere to the **modelRxiv protocol**. This involves ensuring that the **model code** and **model scheme** are correctly formatted and structured to facilitate seamless integration, parameter manipulation, and dynamic visualization generation on the modelRxiv platform.
+
+## Processing Model Code
+
+1. **Conform to modelRxiv Protocol**:
+   - Ensure that your model code follows the structure and conventions specified by modelRxiv.
+   - The code should be executable and capable of generating the necessary outputs for visualization.
+
+2. **Use of Programming Languages**:
+   - **Python (`py`)** or **JavaScript (`js`)** are the supported frameworks.
+   - Specify the framework in the model scheme metadata.
+
+3. **Example of a Compatible Model Code**:
+
+```python
+def step(params: dict, last_step: dict, t: int) -> dict:
+    # Compute the next step given the last step and the model parameters
+    if t == 0:  # When called the first time, return the initial frequency
+        return {'q': params['q0']}
+    q = last_step['q']
+    s = params['s']
+    h = params['h']
+    q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2)
+    return {'q': q_prime}
+```
+
+- The `step` function computes the model's next state based on current parameters and the previous state.
+- Ensure all necessary parameters are defined and utilized within the function.
+
+## Structuring the Model Scheme
+
+The **model scheme** is a configuration file that describes your model's parameters, visual outputs, and other metadata. Proper structuring of the scheme is crucial for modelRxiv to interpret and render your model correctly.
+
+### Metadata Section
+
+1. **Purpose**:
+   - Provides essential information about the study and related publication.
+
+2. **Structure**:
+
+```text
+# Metadata
+title=The Genetical Theory of Natural Selection
+description=Natural Selection is not Evolution. Yet, ever since the two words have been in common use, the theory of Natural Selection has been employed as a convenient abbreviation for the theory of Evolution by means of Natural Selection, put forward by Darwin and Wallace. This has had the unfortunate consequence that the theory of Natural Selection itself has scarcely ever, if ever, received separate consideration.
+authors=R. A. Fisher
+doi=
+type=published
+publication_date=1930
+keywords=natural-selection,evolution
+framework=py
+```
+
+- **Fields**:
+  - `title`: Title of the study.
+  - `description`: Detailed description of the study.
+  - `authors`: Authors of the study.
+  - `doi`: Digital Object Identifier, if available.
+  - `type`: Publication type (`published`, `unpublished`, etc.).
+  - `publication_date`: Year of publication.
+  - `keywords`: Comma-separated keywords relevant to the study.
+  - `framework`: Programming framework used (`py` for Python, `js` for JavaScript).
+
+### Parameter Definitions
+
+1. **Purpose**:
+   - Defines the parameters that users can manipulate within the model.
+
+2. **Structure**:
+
+```text
+# Parameter: s
+name=s
+description=The relative fitness cost of the allele
+value=0.1
+
+# Parameter: step_num
+name=step_num
+description=Number of steps to run the model for
+value=100
+```
+
+- **Fields**:
+  - `name`: Identifier for the parameter.
+  - `description`: Brief explanation of the parameter's role.
+  - `value`: Default value assigned to the parameter.
+
+- **Special Parameters**:
+  - Parameters like `step_num` control model execution specifics (e.g., number of iterations).
+
+### Adding Visualizations
+
+1. **Purpose**:
+   - Connects model outputs to specific visualization types, enabling dynamic result displays.
+
+2. **Structure**:
+
+```text
+# Plot: Allele frequency over time
+type=line
+x=t
+y=q
+xlabel=Generations
+ylabel=Frequency
+```
+
+- **Fields**:
+  - `type`: Type of visualization (`line`, `scatter`, `mat`, etc.).
+  - `x`: Data mapped to the x-axis.
+  - `y`: Data mapped to the y-axis.
+  - `xlabel`: Label for the x-axis.
+  - `ylabel`: Label for the y-axis.
+  - Additional fields like `xlim`, `ylim`, and `legend` can further customize the visualization.
+
+### Defining Parameter Presets
+
+1. **Purpose**:
+   - Provides predefined sets of parameters to guide users through specific scenarios or reproduce certain results.
+
+2. **Structure**:
+
+```text
+# Preset: Positive selection, recessive
+q0=0.1
+s=-0.1
+h=0
+
+# Preset: Negative selection, dominant
+q=0.5
+s=0.1
+h=1
+```
+
+- Each preset modifies existing parameters to specific values, allowing users to explore predefined scenarios.
+
+## AI-assisted Conversion Pipeline
+
+1. **Purpose**:
+   - Facilitates the integration of existing models by automating the conversion of model code and schemes to comply with modelRxiv standards.
+
+2. **Functionality**:
+   - **Conversion**: Transforms model code to be compatible with modelRxiv.
+   - **Scheme Generation**: Creates a matching model scheme based on the converted code's parameters and visualizations.
+
+3. **Consent**:
+   - Using this pipeline implies that the original model code is transmitted to the LLM provider's servers and stored on modelRxiv's servers for pipeline improvement purposes. Refer to the [privacy policy](/privacy.html) for more details.
+
+4. **Usage**:
+   - **Input**: Provide existing model code and scheme.
+   - **Output**: Receive a converted model code and an updated scheme.
+   - **Comments Box**: Optionally, add comments or adjustments to guide the conversion process.
+
+## Testing Model Compatibility
+
+1. **Purpose**:
+   - Ensures that the model code and scheme are correctly interpreted by modelRxiv and that the model produces accurate dynamic outputs.
+
+2. **Procedure**:
+   - **Run Test**: Execute the model within the modelRxiv environment.
+   - **Review Output**: Examine any errors or issues reported.
+   - **Fix Issues**:
+     - **Manual Adjustments**: Modify the model code and scheme as necessary.
+     - **AI-assisted Pipeline**: Utilize the comments box to send errors and additional instructions for automated fixing.
+
+3. **Successful Test**:
+   - Upon passing the test, the model is ready for submission to modelRxiv.
+
+## Implementing Model Analyses
+
+modelRxiv supports models that generate dynamic visualizations on-the-fly. For models requiring computational analyses that may not fit the step-wise dynamics display, you can define functions within your code that generate figures or compatible data formats.
+
+### Example: Generating a Grid Plot
+
+1. **Purpose**:
+   - Allows the model to generate a 2-dimensional grid visualization based on parameter variations.
+
+2. **Implementation Steps**:
+
+   - **Define Analysis Function**:
+
+```python
+import matplotlib.pyplot as plt
+
+async def my_analysis(params):
+    fig = plt.figure(figsize=(6,6))  # Create a square image
+    plt.imshow(np.random.normal(size=(100,100), scale=params['s'], loc=0.5))
+    plt.axis('off')  # Remove axes
+    plt.tight_layout(pad=0)  # Remove padding around image
+    plt.show()
+```
+
+   - **Specify Analysis in Model Scheme**:
+
+```text
+# Analysis: generate_grid
+function=my_analysis
+type=image
+xlabel=x
+ylabel=y
+xlim=0,100
+ylim=0,100
+```
+
+     - **Fields**:
+       - `function`: Name of the analysis function defined in the model code.
+       - `type`: Type of output (`image`, `mat_grayscale`, etc.).
+       - `xlabel` & `ylabel`: Labels for the axes (even if not displayed).
+       - `xlim` & `ylim`: Limits for the axes to ensure proper scaling.
+
+### Example: Fixation Analysis Grid
+
+1. **Purpose**:
+   - Demonstrates a more complex analysis that generates a grayscale matrix representing allele fixation across different parameter values.
+
+2. **Implementation Steps**:
+
+   - **Define Analysis Function**:
+
+```python
+# This function runs the model and returns 1 if the allele is close to fixation
+async def single_run(params):
+    last_step = None
+    for t in range(0, int(params['step_num']) + 1):
+        next_step = step(params, last_step, t)
+        if not next_step:
+            break
+        last_step = next_step
+    return int(last_step['q'] > 0.99)
+
+async def run_fixation_grid(params):
+    # Create a grid of parameters, this could also be done with loops
+    s = np.linspace(0, 1, 51)
+    h = np.linspace(0, 1, 51)
+    grid_x, grid_y = np.meshgrid(s, h)
+    grid = np.array([grid_x.reshape(len(s) * len(h)), grid_y.reshape(len(s) * len(h))]).T
+    # Combine with input parameters
+    param_sets = [{**params, 's': x_y[0], 'h': x_y[1]} for x_y in grid]
+    # Distribute grid computation
+    results = await distribute('single_run', param_sets)
+    normalized_matrix = np.array(results).reshape(len(s), len(h)).tolist()
+    return normalized_matrix
+```
+
+     - **Function Descriptions**:
+       - `single_run`: Executes the model for a single parameter set and determines if the allele is close to fixation.
+       - `run_fixation_grid`: Generates a grid of parameter values, distributes the computation across the grid, and compiles the results into a normalized matrix.
+
+     - **Note**: The `distribute` function handles parallel computation to optimize performance.
+
+   - **Specify Analysis in Model Scheme**:
+
+```text
+# Analysis: fixation_analysis_grid
+function=run_fixation_grid
+type=mat_grayscale
+xlabel=s
+ylabel=h
+xlim=0,1
+ylim=0,1
+```
+
+     - **Fields**:
+       - `function`: Name of the analysis function (`run_fixation_grid`).
+       - `type`: Specifies the output type (`mat_grayscale` for a grayscale matrix).
+       - `xlabel` & `ylabel`: Labels corresponding to the parameters varied (`s` and `h`).
+       - `xlim` & `ylim`: Define the parameter ranges to ensure the plot scales correctly.
+
+   - **Define Parameter Presets for Analyses**:
+
+```text
+# Preset: Fig. 2: Fixation grid (q0=0.5)
+analysis=fixation_analysis_grid
+q0=0.5
+
+# Preset: Fig. 2: Fixation grid (q0=0.1)
+analysis=fixation_analysis_grid
+q0=0.1
+```
+
+     - These presets allow users to generate fixation grids with different initial allele frequencies (`q0`).
+
+3. **Best Practices**:
+   - **Efficiency**: Optimize analysis functions to run within a few minutes to maintain user engagement.
+   - **Compatibility**: Ensure that analysis outputs align with modelRxiv's supported visualization types (`mat_grayscale`, `image`, etc.).
+
+## Supported Visualizations
+
+modelRxiv supports a variety of visualization types to represent model dynamics. Below are the supported plots and their configurations:
+
+### Line Plot (`line`)
+
+- **Description**: Ideal for time-series data, updating one or more lines per step.
+- **Scheme Example**:
+
+```text
+# Plot: Population size over time
+type=line
+x=t
+y=N
+xlabel=Generations
+ylabel=Population size
+xlim=0,step_num
+ylim=0,K
+```
+
+- **Multiple Lines**: Separate multiple `y` parameters with commas and define legends.
+
+```text
+# Plot: Population size over time
+type=line
+x=t
+y=N1,N2
+xlabel=Generations
+ylabel=Population size
+xlim=0,step_num
+ylim=0,K
+legend=N_1,N_2
+```
+
+- **Compatible Model Code**:
+
+```python
+def step(params, last_step, t):
+    K = params['K']
+    r = params['r']
+    if not last_step:
+        return {'N': params['K'] / 2}  # Set initial population size
+    N = last_step['N']
+    N_next = r * N * (1 - (N / K))
+    return {'N': N_next}
+```
+
+### Multiple Line Plot (`lines`)
+
+- **Description**: Suitable for plotting replicates in stochastic simulations.
+- **Scheme Example**:
+
+```text
+# Plot: Allele frequency in repeats
+type=lines
+xlabel=Generations
+ylabel=Frequency
+xlim=0,step_num
+ylim=0,1
+x=t
+y=q
+```
+
+- **Compatible Model Code**:
+
+```python
+def step(params, last_step, t):
+    repeats = params['repeats']
+    N = params['N']
+    if not last_step:
+        return {'q': np.full(repeats, 0.5)}  # Start all simulations at q=0.5
+    q = np.array(last_step['q'])
+    q_next = np.random.binomial(N, q, size=len(q)) / N  # Drift
+    return {'q': q_next}
+```
+
+### Scatter Plot (`scatter`)
+
+- **Description**: Displays two-dimensional data, such as object positions or attribute correlations.
+- **Scheme Example**:
+
+```text
+# Plot: Population movement
+type=scatter
+xlim=0,100
+ylim=0,100
+data=pop1,pop2
+```
+
+- **Compatible Model Code**:
+
+```python
+def step(params: dict, last_step: dict, t: int) -> dict:
+    N = params['N']
+    if t == 0:
+        # Random initial coordinates
+        pop1 = np.random.choice(100, (N, 2))
+        pop2 = np.random.choice(100, (N, 2))
+        return {'pop1': pop1, 'pop2': pop2}
+    # Update agent coordinates using random steps multiplied by step size
+    pop1_next = np.array(last_step['pop1']) + np.random.choice([-1, 1], size=(N, 2)) * params['move_size_1']
+    pop2_next = np.array(last_step['pop2']) + np.random.choice([-1, 1], size=(N, 2)) * params['move_size_2']
+    return {'pop1': pop1_next, 'pop2': pop2_next}
+```
+
+### 2-dimensional Matrix (`mat`)
+
+- **Description**: Visualizes patches, such as changes across a landscape or population structure.
+- **Scheme Example**:
+
+```text
+# Plot: Patches
+type=mat
+xlim=0,1
+ylim=0,1
+data=q
+legend=Low frequency,High frequency
+```
+
+- **Compatible Model Code**:
+
+```python
+def step(params, last_step, t):
+    grid_size = params['grid_size']
+    if not last_step:
+        q = np.full((grid_size, grid_size), 0.5)
+        return {'q': q, 'patches': np.zeros((0, 3))}
+    edge_matrix = generate_graph_from_grid(grid_size)
+    M = migration_matrix_from_edge_matrix(params, edge_matrix)
+    q_migration = np.dot(np.array(last_step['q']).reshape(grid_size**2), M)
+    q_drift = np.random.binomial(params['N'], q_migration, size=len(q_migration)) / params['N']
+    q_matrix = q_drift.reshape(grid_size, grid_size)
+    not_fixed_indices = np.where((q_matrix > 0.01) & (q_matrix < 0.99))
+    patches = np.array([*not_fixed_indices, q_matrix[not_fixed_indices]]).T
+    return {'q': q_matrix, 'patches': patches}
+```
+
+### 2-dimensional Grid (`grid`)
+
+- **Description**: Specifies coordinates of patches, allowing for non-uniform grid distributions.
+- **Scheme Example**:
+
+```text
+# Plot: Patches without fixed
+type=grid
+xlabel=x
+ylabel=y
+xlim=0,grid_size
+ylim=0,grid_size
+data=patches
+legend=Low frequency,High frequency
+```
+
+- **Compatible Model Code**:
+
+```python
+def step(params, last_step, t):
+    edge_matrix, nodes = generate_graph_from_grid(params['grid_size'])
+    edges = lines_from_edge_matrix(edge_matrix, nodes)
+    M = migration_matrix_from_edge_matrix(params, edge_matrix)
+    if not last_step:
+        q = np.full(M.shape[0], 0.5)
+        nodes_q = np.insert(nodes, 2, q, axis=1)
+        return {'q': q, 'nodes_edges': [nodes_q, edges]}
+    q_migration = np.dot(last_step['q'], M)
+    q_drift = np.random.binomial(params['N'], q_migration, size=len(q_migration)) / params['N']
+    nodes_q = np.insert(nodes, 2, q_drift, axis=1)
+    return {'q': q_drift, 'nodes_edges': [nodes_q, edges]}
+```
+
+### 2-dimensional Network (`network_plot`)
+
+- **Description**: Represents networks with nodes and edges, updating each time step to visualize changes.
+- **Scheme Example**:
+
+```text
+# Plot: Population structure
+type=network_plot
+xlabel=x
+ylabel=y
+xlim=0,1
+ylim=0,1
+data=nodes_edges
+legend=Low frequency,High frequency
+```
+
+- **Compatible Model Code**:
+
+```python
+def migration_matrix_from_edge_matrix(params, edge_matrix):
+    n = edge_matrix.shape[0]
+    M = edge_matrix * params['m']
+    M[range(n), range(n)] = 0
+    M[range(n), range(n)] = 1 - np.sum(M, axis=1)
+    return M
+
+def lines_from_edge_matrix(edge_matrix, nodes):
+    if len(nodes) == 0:
+        return []
+    indices = np.triu_indices(edge_matrix.shape[0], k=1)
+    edges = np.array(indices).T[edge_matrix[indices] > 0.0001]
+    lines = nodes[edges]
+    return lines
+
+def generate_graph_from_grid(grid_size):
+    mat_size = grid_size**2
+    M = np.zeros([mat_size, mat_size])
+    main_diag = np.diag_indices(mat_size, 2)
+    d1 = np.array([main_diag[0][:-1], main_diag[1][1:]]).T
+    d2 = np.array([main_diag[0][:-grid_size], main_diag[1][grid_size:]]).T
+    M[d1[:,0], d1[:,1]] = 1
+    M[d2[:,0], d2[:,1]] = 1
+    M[d1[:,0][grid_size-1::grid_size], d1[:,1][grid_size-1::grid_size]] = 0
+    nodes = 0.5 / grid_size + np.indices((grid_size, grid_size)).T.reshape(grid_size**2, 2) / grid_size
+    return M + M.T, nodes
+
+def step(params, last_step, t):
+    edge_matrix, nodes = generate_graph_from_grid(params['grid_size'])
+    edges = lines_from_edge_matrix(edge_matrix, nodes)
+    M = migration_matrix_from_edge_matrix(params, edge_matrix)
+    if not last_step:
+        q = np.full(M.shape[0], 0.5)
+        nodes_q = np.insert(nodes, 2, q, axis=1)
+        return {'q': q, 'nodes_edges': [nodes_q, edges]}
+    q_migration = np.dot(last_step['q'], M)
+    q_drift = np.random.binomial(params['N'], q_migration, size=len(q_migration)) / params['N']
+    nodes_q = np.insert(nodes, 2, q_drift, axis=1)
+    return {'q': q_drift, 'nodes_edges': [nodes_q, edges]}
+```
+
+- We use the `nodes_edges` output of the model for the plot, which contains the position of the nodes in the grid and their value (in this case, their allele frequency), and the edges between nodes.
+- We can also indicate what the extremes of the color scale indicate using the `legend`.
+- Importantly, the x- and y-axis limits should be set according to the maximal coordinate values of the nodes.
+
+## Best Practices
+
+1. **Code Quality**:
+   - Ensure that the model code is free of syntax errors.
+
+2. **Scheme Accuracy**:
+   - Accurately reflect all parameters used in the model code within the scheme.
+   - Ensure that visualization configurations correctly map to the model outputs.
+
+3. **Documentation**:
+   - Provide clear descriptions for all parameters and visualizations to aid users in understanding and interacting with the model.
+
+---
+
+**Note**: Ensure that both your model code and scheme are thoroughly tested and adhere to the modelRxiv protocols to provide a seamless and interactive experience for users accessing your model on the platform.
+
+modelRxiv is a platform for sharing publicly-available biological models. Models can be provided in a variety of formats, but to be compatible with modelRxiv, model code must confirm to a certain protocol, detailed below. This protocol has two parts: the *model code*, which must be in either Python or JavaScript (so that it runs in the browser), and a *model scheme*, which describes the model inputs (user-defined parameters) and outputs (plots, parameter presets and analyses).
+
+The model code must implement a step function that takes the model parameters (params), the previous step, and the time point (t), and returns the next step (models can be written in Python or JavaScript). The code can have other functions that can be called within the step function. The state of the model should not be maintained through globals but using the "last_step" variable as shown below.
+
+```python
+def step(params: dict, last_step: dict, t: int) -> dict: ## Contains the main model logic
+    ## Compute the next step given the last step and the model parameters
+    ## For example, return the next step of a population genetics model
+    if t == 0: ## When called the first time, return the initial step
+        return {'q': params['q0']}
+    q = last_step['q']
+    s = params['s']
+    h = params['h']
+    q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2)
+    return {'q': q_prime}
+```
+
+```javascript
+const step = (params, last_step, t) => { // Contains the main model logic
+    // Compute the next step given the last step and the model parameters
+    // For example, return the next step of a population genetics model
+    if (t === 0) { // When called the first time, return the initial step
+        return {'q': params['q0']};
+    }
+    let q = last_step['q'];
+    let s = params['s'];
+    let h = params['h'];
+    let q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2);
+    return {'q': q_prime};
+}
+```
+
+We also need a scheme that describes the model, such as listing its parameters, the plots of the model dynamics that will be generated, parameter presets, and the basic metadata. We can infer some of these attributes from the model code, looking at the parameters used (in `params`) and also at the dictionary that is returned by the step function to understand what we can plot. For instance, in the example below, we see that the parameters `s`, `h` and `q0` are used, while `q` is returned by the step function, allowing us to track `q` over time. We can also provide the user some examples of *presets* which are parameter combinations that give specific outcomes or dynamics. Consider the Python model code we saw above:
+
+```python
+def step(params: dict, last_step: dict, t: int) -> dict: ## Contains the main model logic
+    ## Compute the next step given the last step and the model parameters
+    ## For example, return the next step of a population genetics model
+    if t == 0: ## When called the first time, return the initial step
+        return {'q': params['q0']}
+    q = last_step['q']
+    s = params['s']
+    h = params['h']
+    q_prime = (q**2 * (1 - s) + q * (1 - q) * (1 - h * s)) / (q**2 * (1 - s) + 2 * q * (1 - q) * (1 - h * s) + (1 - q)**2)
+    return {'q': q_prime}
+```
+
+An example scheme file we can write for this model is (the description part can be more elaborate):
+
+```text
+# Metadata
+title=Population genetics model
+description=The model tracks the frequency on an allele over time as it changes owing to selection
+authors=Joe Smith, Jane Doe
+doi=
+type=preprint
+publication_date=01-01-2020
+keywords=population-genetics
+framework=py
+
+# Parameter: s
+name=s
+description=Fitness cost of the allele
+value=0.5
+
+# Parameter: h
+name=h
+description=Dominance of the allele over the wild type allele
+value=1
+
+# Parameter: q_0
+name=q0
+description=Initial frequency of the allele
+
+# Parameter: Steps
+name=step_num
+description=Number of steps to run the model for
+value=100
+
+# Plot: Allele frequency
+type=line
+xlabel=Generations
+ylabel=Frequency
+xlim=0,step_num
+ylim=0,1
+x=t
+y=q
+
+# Preset: Fig. 1, Negative selection
+s=0.1
+h=0.5
+
+# Preset: Fig. 1, Positive selection
+s=-0.1
+h=0
+```
