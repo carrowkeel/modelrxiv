@@ -213,7 +213,7 @@ const hooks = (query, scheme, elem, timeouts) => [
 		const user_comments_textarea = form.querySelector('.user-llm-comments textarea');
 		[scheme_textarea, code_textarea, user_comments_textarea].forEach(elem => {
 			elem.setAttribute('disabled', 'disabled');
-			elem.classList.add('loading');
+			elem.parentElement.classList.add('loading');
 		});
 		form.querySelector('[data-action="submit"]').classList.add('disabled');
 		document.querySelectorAll('[data-action="convert-code"]').forEach(item => item.classList.add('loading'));
@@ -225,7 +225,7 @@ const hooks = (query, scheme, elem, timeouts) => [
 		user_comments_textarea.value = '';
 		[scheme_textarea, code_textarea, user_comments_textarea].forEach(elem => {
 			elem.removeAttribute('disabled', 'disabled');
-			elem.classList.remove('loading');
+			elem.parentElement.classList.remove('loading');
 		});
 		document.querySelectorAll('[data-action="convert-code"]').forEach(item => item.classList.remove('loading'));
 	}],
