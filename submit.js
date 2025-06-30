@@ -56,6 +56,48 @@ const getCredentials = async (property) => {
 	return credentials[property];
 };
 
+const uploadPDF = async () => {
+	const [handle] = await window.showOpenFilePicker({
+		multiple: false,
+		types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }]
+	});
+	const file = await handle.getFile();
+	const buffer = await file.arrayBuffer();
+	const res = await fetch(`/upload/${encodeURIComponent(file.name)}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': file.type || 'application/pdf' },
+		body: buffer
+	});
+	if (!res.ok)
+		throw new Error(`Upload failed: ${res.status}`);
+	return encodeURIComponent(file.name);
+};
+
+const convertPDF = async (form, autotest=false) => {
+	const pdf_filename = await uploadPDF();
+	const request_id = generateID();
+	const request_type = 'pdf';
+	const request = await fetch(`https://d.modelrxiv.org/import`, {method: 'post', headers: {Authorization: `Basic ${await getCredentials('token')}`, 'Content-Type': 'application/json'}, body: JSON.stringify({request_id, request_type, pdf_filename})}).then(res => res.json()).catch(e => ({error: e}));
+	try {
+		const result = await pollResult(`/resources/${await getCredentials('user_id')}/${request_id}`, undefined, 200).then(res => res.text());
+		const code_part = result.match(/[\`]{3}(python|javascript|code)(.*?)[\`]{3}/s) || ['', '', ''];
+		const scheme_part = result.match(/[\`]{3}(text)(.*?)[\`]{3}/s) || ['', '', ''];
+		const text_part = result.replace(/[\`]{3}.*?[\`]{3}/gs, '[code shown above]');
+		if (code_part[2] !== '')
+			addCodeBox('code', generateID(6), 'LLM Response', code_part[2]);
+		if (scheme_part[2] !== '')
+			addCodeBox('scheme', generateID(6), 'LLM Response', scheme_part[2]);
+		const llm_response_pre = document.createElement('pre');
+		llm_response_pre.innerText = text_part;
+		document.querySelector('.llm-response-box').innerHTML = '';
+		document.querySelector('.llm-response-box').appendChild(llm_response_pre);
+		if (autotest)
+			document.querySelector('[data-action="test-code"]').click();
+	} catch (e) {
+		console.log(e);
+	}
+};
+
 const queryLLM = async (form, scheme, code, code_error='', user_comments='', autotest=false) => {
 	const request_id = generateID();
 	const request_type = 'both';
@@ -202,6 +244,28 @@ const hooks = (query, scheme, elem, timeouts) => [
 			e.target.value = e.target.value.slice(0, ss).concat('\t').concat(e.target.value.slice(se, e.target.value.length));
 			e.target.selectionStart = e.target.selectionEnd = ss + 1;
 		}
+	}],
+	['[data-action="convert-pdf"]', 'click', async e => {
+		if (e.target.classList.contains('loading'))
+			return;
+		const form = e.target.closest('.form');
+		e.target.closest('.section').classList.remove('hidden');
+		const scheme_textarea = form.querySelector('.scheme [data-tab-content].selected textarea');
+		const code_textarea = form.querySelector('.code [data-tab-content].selected textarea');
+		const user_comments_textarea = form.querySelector('.user-llm-comments textarea');
+		[scheme_textarea, code_textarea, user_comments_textarea].forEach(elem => {
+			elem.setAttribute('disabled', 'disabled');
+			elem.parentElement.classList.add('loading');
+		});
+		form.querySelector('[data-action="submit"]').classList.add('disabled');
+		document.querySelectorAll('[data-action="convert-code"]').forEach(item => item.classList.add('loading'));
+		await convertPDF(form);
+		user_comments_textarea.value = '';
+		[scheme_textarea, code_textarea, user_comments_textarea].forEach(elem => {
+			elem.removeAttribute('disabled', 'disabled');
+			elem.parentElement.classList.remove('loading');
+		});
+		document.querySelectorAll('[data-action="convert-code"]').forEach(item => item.classList.remove('loading'));
 	}],
 	['[data-action="convert-code"]', 'click', async e => {
 		if (e.target.classList.contains('loading'))
