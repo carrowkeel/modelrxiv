@@ -318,6 +318,7 @@ export const init = async (container, query_path=window.location.pathname) => {
 		scheme.code = await fetch(`/models/${model_id}.${framework}`).then(res => res.text());
 	scheme.script_uri = query.sandbox ? `/user/${model_id}.${framework}` : `/models/${model_id}.${framework}`;
 	scheme.keywords_html = scheme.keywords ? `Keywords: ${scheme.keywords.split(',').map(keyword => `<a href="/keywords/${keyword}">${keyword}</a>`).join(', ')}` : '';
+	document.title = `${scheme.title} | modelRxiv`;
 	replaceStrings(Object.assign({}, scheme, {presets: presetsText(scheme.preset), parameters: parametersForm(scheme.parameter)}));
 	container.querySelectorAll('.shorten').forEach(elem => {
 		const text = elem.innerHTML;
